@@ -12,6 +12,14 @@
 /voicepacks/
 /tmp/
 /.cache/
+/android/.deps/
+/android/.downloads/
+/android/.gradle/
+/android/.jdk/
+/android/.sdk/
+/android/app/.cxx/
+/android/app/build/
+/android/local.properties
 **/__pycache__/
 *.py[cod]
 /*.log

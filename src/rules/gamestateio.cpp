@@ -104,7 +104,9 @@ namespace GameData
 
     const char* recoveryPlatform(void)
     {
-#if defined(_WIN32)
+#if defined(__ANDROID__) || defined(ANDROID)
+        return "android";
+#elif defined(_WIN32)
         return "windows";
 #elif defined(__APPLE__)
         return "macos";

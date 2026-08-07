@@ -1,0 +1,110 @@
+plugins {
+    id "com.android.application"
+}
+
+def gameRoot = rootDir.parentFile
+def sdlRoot = new File(rootDir, ".deps/SDL2-2.32.10")
+def generatedAssets = layout.buildDirectory.dir("generated/assets/fourWinds")
+
+android {
+    namespace "com.jaskes.fourwindsreborn"
+    compileSdk 35
+    ndkVersion "27.2.12479018"
+
+    defaultConfig {
+        applicationId "com.jaskes.fourwindsreborn"
+        minSdk 23
+        targetSdk 35
+        versionCode 400
+        versionName "0.4.0-dev"
+
+        externalNativeBuild {
+            cmake {
+                arguments "-DANDROID_STL=c++_shared",
+                          "-DBUILD_TESTING=OFF",
+                          "-DFOUR_WINDS_WINDOWS_GUI=OFF"
+                abiFilters "arm64-v8a"
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            debuggable true
+            jniDebuggable true
+        }
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path file("../../CMakeLists.txt")
+            version "3.22.1"
+        }
+    }
+
+    sourceSets {
+        main {
+            java.srcDirs = [
+                "src/main/java",
+                new File(sdlRoot, "android-project/app/src/main/java")
+            ]
+            assets.srcDir generatedAssets
+        }
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
+        resources {
+            excludes += ["META-INF/**"]
+        }
+    }
+
+    androidResources {
+        noCompress += ["json", "mo", "ogg", "mid", "ttf"]
+    }
+
+    lint {
+        abortOnError true
+        checkReleaseBuilds true
+        // SDL's vendored Android glue is compiled as source and currently
+        // triggers API-35 checks inside upstream Bluetooth/HID code.  Keep a
+        // narrow baseline for those known findings so new issues in our own
+        // Activity and manifest still fail CI.
+        baseline = file("lint-baseline.xml")
+    }
+}
+
+tasks.register("syncGameAssets", Sync) {
+    group = "build"
+    description = "Copies theme data into the APK and writes its virtual filesystem manifest."
+    from(gameRoot) {
+        include "themes/**"
+        exclude "themes/**/__pycache__/**"
+        exclude "themes/**/*.tmp"
+    }
+    into(generatedAssets)
+
+    doLast {
+        File root = generatedAssets.get().asFile
+        List<String> manifest = []
+        root.eachFileRecurse { File file ->
+            if(file.isFile() && file.name != "assets.list") {
+                manifest.add(root.toPath().relativize(file.toPath()).toString().replace('\\', '/'))
+            }
+        }
+        manifest.sort()
+        new File(root, "assets.list").setText(manifest.join("\n") + "\n", "UTF-8")
+    }
+}
+
+tasks.configureEach { task ->
+    if(task.name.startsWith("merge") && task.name.endsWith("Assets")) {
+        task.dependsOn tasks.named("syncGameAssets")
+    }
+}

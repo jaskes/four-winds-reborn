@@ -572,6 +572,12 @@ int main(int argc, char **argv)
 {
     Systems::setLocale(LC_ALL, "");
     Systems::setLocale(LC_NUMERIC, "C");
+#if defined(ANDROID)
+    // Android packages themes as virtual APK assets. Load the generated
+    // manifest before content discovery so the normal catalog and theme
+    // loading paths can treat those assets like a read-only filesystem.
+    Systems::assetsInit();
+#endif
     CrashReport::install(Application::domain());
     CrashReport::breadcrumb("Startup stage=process status=begin");
 

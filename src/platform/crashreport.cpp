@@ -30,8 +30,11 @@
 #endif
 #endif
 
-#if defined(__APPLE__) || defined(__linux__)
+#if (defined(__APPLE__) || defined(__linux__)) && !defined(__ANDROID__)
 #include <execinfo.h>
+#endif
+
+#if defined(__APPLE__) || defined(__linux__)
 #include <fcntl.h>
 #include <unistd.h>
 #endif
@@ -195,9 +198,14 @@ void writeStackTrace(void)
 {
     if(reportDescriptor < 0) return;
 
+#if defined(__ANDROID__)
+    static const char unavailable[] = "Native stack trace unavailable in the Android signal handler.\n";
+    writeAll(unavailable, sizeof(unavailable) - 1);
+#else
     void* frames[64] = {};
     const int count = ::backtrace(frames, 64);
     if(0 < count) ::backtrace_symbols_fd(frames, count, reportDescriptor);
+#endif
 }
 
 void fatalSignalHandler(int signal)
