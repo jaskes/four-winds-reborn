@@ -13,14 +13,15 @@ LGPL-3.0-or-later license and upstream attribution.
 ## Download
 
 The latest stable release is
-[Four Winds Reborn v0.3.0](https://github.com/jaskes/four-winds-reborn/releases/latest),
-with ready-to-run Windows, Linux and macOS x64 archives plus SHA-256 checksums.
-On Windows, unpack the archive and launch `four-winds-reborn.exe`.
+[Four Winds Reborn v0.4.0](https://github.com/jaskes/four-winds-reborn/releases/latest),
+with ready-to-run Windows, Linux and macOS x64 archives, a directly installable
+Android arm64 APK and SHA-256 checksums. On Windows, unpack the archive and
+launch `four-winds-reborn.exe`; on Android 6.0 or newer, install the APK.
 
 ## Roadmap
 
-- Make Android the focus of v0.4.0, with native touch controls, safe app
-  lifecycle handling and compatible saves.
+- Improve Android ergonomics with larger touch targets and broader device
+  coverage after the initial native arm64 release.
 - Prove the shared ruleset contract with additional local Rune Game rules,
   followed by separate Duel and Coalition modes.
 - Add authoritative multiplayer last, after Android and the local rulesets are
@@ -88,10 +89,23 @@ On Windows, install [MSYS2](https://www.msys2.org/) and run:
 .\scripts\build-windows.ps1 -InstallDeps
 ```
 
+For the native Android arm64 build, bootstrap the pinned JDK, SDK/NDK, Gradle
+and SDL toolchain, then build the APK:
+
+```powershell
+.\scripts\bootstrap-android.ps1
+.\scripts\build-android.ps1 -Configuration Debug
+```
+
+The Android architecture, package contract and physical-device acceptance
+checklist are documented in
+[Android Development](docs/AndroidDevelopment.md).
+
 ## Documentation
 
-Rules, balance evidence, localization/provenance, archived original sources and
-the release workflow are indexed in [the documentation guide](docs/README.md).
+Rules, balance evidence, localization/provenance, platform development,
+archived original sources and the release workflow are indexed in
+[the documentation guide](docs/README.md).
 Completed player-facing work is recorded in the [changelog](CHANGELOG.md).
 
 ## License and attribution

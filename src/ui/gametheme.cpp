@@ -96,17 +96,6 @@ void GameTheme::clear(void)
 
 bool GameTheme::loadResources(const Application & app)
 {
-#if defined(ANDROID)
-    const char* list = "assets.list";
-    std::string str;
-    Systems::readFile2String(list, str);
-    if(str.empty())
-    {
-	ERROR("file not found: " << list);
-	return false;
-    }
-    resourceFiles << String::split(str, 0x0A);
-#else
     StringList shareDirs = Systems::shareDirectories(app.domain());
 
     if(app.program)
@@ -138,7 +127,6 @@ bool GameTheme::loadResources(const Application & app)
         VERBOSE("find files order: " << *it);
         resourceFiles << Systems::findFiles(*it);
     }
-#endif
 
     return 0 < resourceFiles.size();
 }

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.14)
 
-project(FourWindsReborn VERSION 0.3.0)
+project(FourWindsReborn VERSION 0.4.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
@@ -8,7 +8,91 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(SWE_WITH_JSON ON CACHE BOOL "enable json" FORCE)
 set(SWE_WITH_LUA OFF CACHE BOOL "disable lua" FORCE)
 set(SWE_EXAMPLES OFF CACHE BOOL "disable examples" FORCE)
-set(SWE_DISABLE_TERMGUI OFF CACHE BOOL "enable termwin_gui" FORCE)
+if(ANDROID)
+    # Rune War uses SWE's windowed GUI widgets for dialogs and the developer
+    # console. Despite the historical option name, this is not a host terminal
+    # dependency and must remain enabled on Android.
+    set(SWE_DISABLE_TERMGUI OFF CACHE BOOL "enable SWE GUI widgets on Android" FORCE)
+    set(SWE_DLOPEN OFF CACHE BOOL "disable dlopen on Android" FORCE)
+    set(SWE_LOG_COLORED OFF CACHE BOOL "disable ANSI colors in logcat" FORCE)
+else()
+    set(SWE_DISABLE_TERMGUI OFF CACHE BOOL "enable termwin_gui" FORCE)
+endif()
+
+if(ANDROID)
+    set(FOUR_WINDS_ANDROID_DEPS_DIR
+        "${CMAKE_CURRENT_SOURCE_DIR}/android/.deps"
+        CACHE PATH "Directory containing bootstrapped SDL2 Android sources")
+
+    set(FOUR_WINDS_SDL2_DIR "${FOUR_WINDS_ANDROID_DEPS_DIR}/SDL2-2.32.10")
+    set(FOUR_WINDS_SDL2_IMAGE_DIR "${FOUR_WINDS_ANDROID_DEPS_DIR}/SDL2_image-2.8.12")
+    set(FOUR_WINDS_SDL2_MIXER_DIR "${FOUR_WINDS_ANDROID_DEPS_DIR}/SDL2_mixer-2.8.2")
+    set(FOUR_WINDS_SDL2_TTF_DIR "${FOUR_WINDS_ANDROID_DEPS_DIR}/SDL2_ttf-2.24.0")
+    foreach(dep_dir IN ITEMS
+            FOUR_WINDS_SDL2_DIR
+            FOUR_WINDS_SDL2_IMAGE_DIR
+            FOUR_WINDS_SDL2_MIXER_DIR
+            FOUR_WINDS_SDL2_TTF_DIR)
+        if(NOT EXISTS "${${dep_dir}}/CMakeLists.txt")
+            message(FATAL_ERROR
+                "Missing Android dependency ${dep_dir}: ${${dep_dir}}. "
+                "Run scripts/bootstrap-android.ps1 first.")
+        endif()
+    endforeach()
+
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+    set(SDL_SHARED ON CACHE BOOL "Build SDL2 shared for SDLActivity" FORCE)
+    set(SDL_STATIC OFF CACHE BOOL "Do not duplicate SDL2 inside libmain" FORCE)
+    set(SDL_TEST OFF CACHE BOOL "Disable SDL2 test library" FORCE)
+    set(SDL_TESTS OFF CACHE BOOL "Disable SDL2 tests" FORCE)
+    set(SDL_INSTALL OFF CACHE BOOL "Disable SDL2 install targets" FORCE)
+    add_subdirectory("${FOUR_WINDS_SDL2_DIR}" android-sdl2 EXCLUDE_FROM_ALL)
+
+    set(BUILD_SHARED_LIBS ON CACHE BOOL "Build SDL satellite libraries shared" FORCE)
+    set(SDL2IMAGE_INSTALL OFF CACHE BOOL "Disable SDL2_image install target" FORCE)
+    set(SDL2IMAGE_SAMPLES OFF CACHE BOOL "Disable SDL2_image samples" FORCE)
+    set(SDL2IMAGE_TESTS OFF CACHE BOOL "Disable SDL2_image tests" FORCE)
+    set(SDL2IMAGE_BACKEND_STB ON CACHE BOOL "Use dependency-free PNG/JPEG loader" FORCE)
+    set(SDL2IMAGE_AVIF OFF CACHE BOOL "Disable unused AVIF support" FORCE)
+    set(SDL2IMAGE_GIF OFF CACHE BOOL "Disable unused GIF support" FORCE)
+    set(SDL2IMAGE_JXL OFF CACHE BOOL "Disable unused JXL support" FORCE)
+    set(SDL2IMAGE_LBM OFF CACHE BOOL "Disable unused LBM support" FORCE)
+    set(SDL2IMAGE_PCX OFF CACHE BOOL "Disable unused PCX support" FORCE)
+    set(SDL2IMAGE_PNM OFF CACHE BOOL "Disable unused PNM support" FORCE)
+    set(SDL2IMAGE_QOI OFF CACHE BOOL "Disable unused QOI support" FORCE)
+    set(SDL2IMAGE_SVG OFF CACHE BOOL "Disable unused SVG support" FORCE)
+    set(SDL2IMAGE_TGA OFF CACHE BOOL "Disable unused TGA support" FORCE)
+    set(SDL2IMAGE_TIF OFF CACHE BOOL "Disable unused TIFF support" FORCE)
+    set(SDL2IMAGE_WEBP OFF CACHE BOOL "Disable unused WebP support" FORCE)
+    set(SDL2IMAGE_XCF OFF CACHE BOOL "Disable unused XCF support" FORCE)
+    set(SDL2IMAGE_XPM OFF CACHE BOOL "Disable unused XPM support" FORCE)
+    set(SDL2IMAGE_XV OFF CACHE BOOL "Disable unused XV support" FORCE)
+    add_subdirectory("${FOUR_WINDS_SDL2_IMAGE_DIR}" android-sdl2-image EXCLUDE_FROM_ALL)
+
+    set(SDL2MIXER_INSTALL OFF CACHE BOOL "Disable SDL2_mixer install target" FORCE)
+    set(SDL2MIXER_DEPS_SHARED OFF CACHE BOOL "Link codec helpers into SDL2_mixer" FORCE)
+    set(SDL2MIXER_VENDORED ON CACHE BOOL "Use bundled lightweight codecs" FORCE)
+    set(SDL2MIXER_SAMPLES OFF CACHE BOOL "Disable SDL2_mixer samples" FORCE)
+    set(SDL2MIXER_CMD OFF CACHE BOOL "Disable external music commands" FORCE)
+    set(SDL2MIXER_FLAC OFF CACHE BOOL "Disable unused FLAC support" FORCE)
+    set(SDL2MIXER_GME OFF CACHE BOOL "Disable unused GME support" FORCE)
+    set(SDL2MIXER_MOD OFF CACHE BOOL "Disable unused module support" FORCE)
+    set(SDL2MIXER_MP3 OFF CACHE BOOL "Disable unused MP3 support" FORCE)
+    set(SDL2MIXER_MIDI ON CACHE BOOL "Keep classic MIDI soundtrack support" FORCE)
+    set(SDL2MIXER_MIDI_FLUIDSYNTH OFF CACHE BOOL "Disable FluidSynth" FORCE)
+    set(SDL2MIXER_MIDI_TIMIDITY ON CACHE BOOL "Use built-in Timidity MIDI player" FORCE)
+    set(SDL2MIXER_OPUS OFF CACHE BOOL "Disable unused Opus support" FORCE)
+    set(SDL2MIXER_VORBIS STB CACHE STRING "Use built-in OGG Vorbis decoder" FORCE)
+    set(SDL2MIXER_WAVE ON CACHE BOOL "Keep WAV support" FORCE)
+    set(SDL2MIXER_WAVPACK OFF CACHE BOOL "Disable unused WavPack support" FORCE)
+    add_subdirectory("${FOUR_WINDS_SDL2_MIXER_DIR}" android-sdl2-mixer EXCLUDE_FROM_ALL)
+
+    set(SDL2TTF_INSTALL OFF CACHE BOOL "Disable SDL2_ttf install target" FORCE)
+    set(SDL2TTF_VENDORED ON CACHE BOOL "Use vendored FreeType" FORCE)
+    set(SDL2TTF_SAMPLES OFF CACHE BOOL "Disable SDL2_ttf samples" FORCE)
+    set(SDL2TTF_HARFBUZZ OFF CACHE BOOL "Disable optional HarfBuzz" FORCE)
+    add_subdirectory("${FOUR_WINDS_SDL2_TTF_DIR}" android-sdl2-ttf EXCLUDE_FROM_ALL)
+endif()
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DBUILD_DEBUG")
 
@@ -154,20 +238,29 @@ include_directories(
     src/platform
     src/rules
     src/ui)
-add_executable(four_winds_reborn ${FOUR_WINDS_SOURCE})
-target_compile_definitions(four_winds_reborn PRIVATE ${FOUR_WINDS_BUILD_DEFINITIONS})
+if(ANDROID)
+    add_library(four_winds_reborn SHARED ${FOUR_WINDS_SOURCE})
+    set_target_properties(four_winds_reborn PROPERTIES OUTPUT_NAME main)
+else()
+    add_executable(four_winds_reborn ${FOUR_WINDS_SOURCE})
+endif()
+target_compile_definitions(four_winds_reborn PRIVATE
+    ${FOUR_WINDS_BUILD_DEFINITIONS}
+    $<$<BOOL:${ANDROID}>:ANDROID>)
 
 target_link_libraries(four_winds_reborn libswe)
 if(WIN32)
     target_link_libraries(four_winds_reborn dbghelp comdlg32)
 endif()
-set_target_properties(four_winds_reborn PROPERTIES
-    OUTPUT_NAME four-winds-reborn
-    WIN32_EXECUTABLE ${FOUR_WINDS_WINDOWS_GUI})
+if(NOT ANDROID)
+    set_target_properties(four_winds_reborn PROPERTIES
+        OUTPUT_NAME four-winds-reborn
+        WIN32_EXECUTABLE ${FOUR_WINDS_WINDOWS_GUI})
+endif()
 
 option(BUILD_TESTING "Build gameplay regression tests" OFF)
 include(CTest)
-if(BUILD_TESTING)
+if(BUILD_TESTING AND NOT ANDROID)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
     add_test(NAME theme_data_validation
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/validate-json.py")
