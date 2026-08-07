@@ -88,10 +88,23 @@ On Windows, install [MSYS2](https://www.msys2.org/) and run:
 .\scripts\build-windows.ps1 -InstallDeps
 ```
 
+For the native Android arm64 build, bootstrap the pinned JDK, SDK/NDK, Gradle
+and SDL toolchain, then build the APK:
+
+```powershell
+.\scripts\bootstrap-android.ps1
+.\scripts\build-android.ps1 -Configuration Debug
+```
+
+The Android architecture, package contract and physical-device acceptance
+checklist are documented in
+[Android Development](docs/AndroidDevelopment.md).
+
 ## Documentation
 
-Rules, balance evidence, localization/provenance, archived original sources and
-the release workflow are indexed in [the documentation guide](docs/README.md).
+Rules, balance evidence, localization/provenance, platform development,
+archived original sources and the release workflow are indexed in
+[the documentation guide](docs/README.md).
 Completed player-facing work is recorded in the [changelog](CHANGELOG.md).
 
 ## License and attribution

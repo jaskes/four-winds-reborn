@@ -39,6 +39,8 @@ and evidence that should change with them.
 
 ## Shipping
 
+- [`AndroidDevelopment.md`](AndroidDevelopment.md) — reproducible native Android
+  toolchain, runtime model, package contract and device acceptance checklist.
 - [`ReleaseProcess.md`](ReleaseProcess.md) — branch policy, release gate,
   tagging, publication and hotfix flow.
 

@@ -169,3 +169,68 @@ jobs:
           name: four-winds-reborn-windows-x64-${{ github.sha }}
           path: dist/windows/**
           retention-days: 7
+
+  android:
+    name: Android arm64 Debug
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out game and engine
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install pinned Android components
+        shell: bash
+        run: >-
+          sdkmanager
+          "platform-tools"
+          "platforms;android-35"
+          "build-tools;35.0.0"
+          "cmake;3.22.1"
+          "ndk;27.2.12479018"
+
+      - name: Set up Gradle 8.10.2
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+
+      - name: Fetch and verify pinned SDL sources
+        shell: pwsh
+        run: ./scripts/fetch-android-dependencies.ps1
+
+      - name: Build and lint Android package
+        shell: bash
+        run: >-
+          gradle --project-dir android --stacktrace
+          :app:lintDebug :app:assembleDebug
+
+      - name: Verify Android package contract
+        shell: bash
+        run: |
+          apk=android/app/build/outputs/apk/debug/app-debug.apk
+          aapt dump badging "$apk" | grep -q "package: name='com.jaskes.fourwindsreborn' versionCode='400' versionName='0.4.0-dev'"
+          aapt dump badging "$apk" | grep -q "native-code: 'arm64-v8a'"
+          unzip -Z1 "$apk" > android-apk-contents.txt
+          for library in SDL2 SDL2_image SDL2_mixer SDL2_ttf main; do
+            grep -qx "lib/arm64-v8a/lib${library}.so" android-apk-contents.txt
+          done
+          grep -qx "lib/arm64-v8a/libc++_shared.so" android-apk-contents.txt
+          grep -qx "assets/assets.list" android-apk-contents.txt
+          grep -q '^assets/themes/classic/' android-apk-contents.txt
+          grep -q '^assets/themes/reborn/' android-apk-contents.txt
+
+      - name: Retain Android test package
+        uses: actions/upload-artifact@v7
+        with:
+          name: four-winds-reborn-android-arm64-debug-${{ github.sha }}
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7

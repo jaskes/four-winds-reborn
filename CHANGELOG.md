@@ -13,7 +13,19 @@ Reborn work only; they do not claim authorship of inherited code or assets.
 
 ## [Unreleased]
 
-_No changes yet._
+### Added - Android foundation
+
+- Added a native Android arm64 application built through SDLActivity, Gradle,
+  CMake and the NDK, with a reproducible pinned SDL2 dependency toolchain.
+- Packaged Classic and Reborn as read-only APK assets with a generated virtual
+  filesystem manifest, while keeping settings, saves, recovery and replays in
+  writable application storage.
+- Added touch/drag input through the existing 1024x768 logical canvas, Android
+  Back handling and pause/resume lifecycle integration for audio, focus and
+  redraws.
+- Added Android package validation, a Debug APK CI artifact and a physical
+  device acceptance checklist. Store signing and publication remain deferred
+  until the release candidate passes manual device testing.
 
 ## [0.3.0] - 2026-07-24
 

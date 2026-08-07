@@ -55,8 +55,14 @@ Before merging a release, freeze its scope and complete all of the following:
    This compares all 52 controlled matches with the retained fixed-seed
    baseline. A deliberate rules or balance change requires reviewed evidence
    and an intentional baseline update, never a silent replacement.
-5. Require green Linux, macOS and Windows CI for the release source.
-6. Smoke-test the exact player package rather than a development-tree binary:
+5. Require green Linux, macOS, Windows and Android CI for the release source.
+6. For an Android release, verify the exact APK with
+   `scripts/test-android-package.ps1` and complete the physical-device matrix
+   in [`AndroidDevelopment.md`](AndroidDevelopment.md). Compilation or an
+   emulator-only pass is not sufficient for lifecycle, touch and storage
+   acceptance.
+7. Smoke-test the exact desktop player package rather than a development-tree
+   binary:
 
    - verify that a clean profile starts in Classic;
    - switch between Classic and Reborn and verify that the selection persists;
