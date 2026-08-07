@@ -13,14 +13,15 @@ LGPL-3.0-or-later license and upstream attribution.
 ## Download
 
 The latest stable release is
-[Four Winds Reborn v0.3.0](https://github.com/jaskes/four-winds-reborn/releases/latest),
-with ready-to-run Windows, Linux and macOS x64 archives plus SHA-256 checksums.
-On Windows, unpack the archive and launch `four-winds-reborn.exe`.
+[Four Winds Reborn v0.4.0](https://github.com/jaskes/four-winds-reborn/releases/latest),
+with ready-to-run Windows, Linux and macOS x64 archives, a directly installable
+Android arm64 APK and SHA-256 checksums. On Windows, unpack the archive and
+launch `four-winds-reborn.exe`; on Android 6.0 or newer, install the APK.
 
 ## Roadmap
 
-- Make Android the focus of v0.4.0, with native touch controls, safe app
-  lifecycle handling and compatible saves.
+- Improve Android ergonomics with larger touch targets and broader device
+  coverage after the initial native arm64 release.
 - Prove the shared ruleset contract with additional local Rune Game rules,
   followed by separate Duel and Coalition modes.
 - Add authoritative multiplayer last, after Android and the local rulesets are

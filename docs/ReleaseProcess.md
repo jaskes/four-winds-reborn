@@ -85,7 +85,7 @@ validator must additionally report zero retained compatibility media.
 Package-neutral project assets may remain shared only when their exact paths
 are listed in `sharedIdenticalMedia`.
 
-For v0.3.0, Classic is the initial presentation and Reborn is an opt-in
+For v0.4.0, Classic is the initial presentation and Reborn is an opt-in
 release-status package. Reborn must not be labelled Preview solely because
 generic compatibility effects remain. Switching the initial presentation to
 Reborn is a separate product decision to make after README screenshots are
@@ -94,23 +94,23 @@ updated and player feedback has been reviewed.
 ## Tag and publish
 
 After the gate and owner smoke test pass, merge the complete integration branch
-into `main` as an explicit release commit. Replace `0.3.0` below with the
+into `main` as an explicit release commit. Replace `0.4.0` below with the
 version being published:
 
 ```bash
 git switch main
 git pull --ff-only origin main
-git merge --no-ff develop -m "release: v0.3.0"
+git merge --no-ff develop -m "release: v0.4.0"
 git push origin main
-git tag -a v0.3.0 -m "Four Winds Reborn v0.3.0"
-git push origin v0.3.0
+git tag -a v0.4.0 -m "Four Winds Reborn v0.4.0"
+git push origin v0.4.0
 ```
 
-Push `main` before the tag. The accepted tag builds and tests Linux, macOS and
-Windows packages, verifies that the Windows executable uses the GUI subsystem,
+Push `main` before the tag. The accepted tag builds and tests Linux, macOS,
+Windows and Android packages, verifies the desktop and APK contracts,
 generates `SHA256SUMS.txt` and publishes the GitHub Release.
 
-Verify all three downloadable archives and their checksums after publication,
+Verify all four downloadable packages and their checksums after publication,
 then return to `develop`. If the release merge itself contains any release-only
 change, reconcile `main` back into `develop`.
 

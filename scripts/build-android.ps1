@@ -2,6 +2,7 @@
 param(
     [ValidateSet("Debug", "Release")]
     [string]$Configuration = "Debug",
+    [string]$VersionName = "0.4.0-dev",
     [switch]$Bootstrap,
     [switch]$Clean
 )
@@ -34,7 +35,11 @@ $env:ANDROID_SDK_ROOT = $sdkRoot
 $env:PATH = "$(Join-Path $javaHome 'bin');$(Join-Path $sdkRoot 'platform-tools');$env:PATH"
 
 $variant = $Configuration.ToLowerInvariant()
-$gradleArgs = @("--project-dir", $android, "--stacktrace")
+$gradleArgs = @(
+    "--project-dir", $android,
+    "--stacktrace",
+    "-PfourWindsVersionName=$VersionName"
+)
 if($Clean) { $gradleArgs += "clean" }
 $gradleArgs += ":app:assemble$Configuration"
 
@@ -51,9 +56,10 @@ if(-not (Test-Path -LiteralPath $apk)) {
 $dist = Join-Path $repo "dist\android"
 New-Item -ItemType Directory -Force -Path $dist | Out-Null
 $suffix = if($Configuration -eq "Debug") { "debug" } else { "release-unsigned" }
-$output = Join-Path $dist "four-winds-reborn-v0.4.0-dev-android-arm64-$suffix.apk"
+$output = Join-Path $dist "four-winds-reborn-v$VersionName-android-arm64-$suffix.apk"
 Copy-Item -LiteralPath $apk -Destination $output -Force
 & (Join-Path $PSScriptRoot "test-android-package.ps1") `
     -Apk $output `
+    -ExpectedVersionName $VersionName `
     -AllowUnsigned:($Configuration -eq "Release")
 Write-Host "Android APK: $output"

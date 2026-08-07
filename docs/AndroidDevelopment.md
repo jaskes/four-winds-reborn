@@ -1,6 +1,6 @@
 # Android Development
 
-Android is the focus of v0.4.0. The port is a native SDL2 application built
+Android support debuted in v0.4.0. The port is a native SDL2 application built
 with Gradle, CMake and the Android NDK; it is not a streamed or web wrapper.
 
 ## Supported development target
@@ -10,7 +10,7 @@ with Gradle, CMake and the Android NDK; it is not a streamed or web wrapper.
 - landscape orientation and the existing 1024x768 logical canvas
 - package id `com.jaskes.fourwindsreborn`
 
-The first release candidate is intentionally distributed as a directly
+The first Android release is intentionally distributed as a directly
 installable APK. Play Store signing and publication are separate distribution
 work and are not part of the v0.4.0 development gate.
 
@@ -74,7 +74,8 @@ GitHub Actions builds and lints the arm64 Debug package, verifies its manifest,
 native libraries and both bundled themes, and retains the APK as an artifact.
 Desktop validation remains unchanged.
 
-An Android release candidate is not accepted from compilation alone. Test the
+An Android release candidate is not accepted from compilation alone. The
+v0.4.0 candidate completed this checklist on a physical arm64 device; test the
 exact APK on a physical device:
 
 1. Install over a clean profile and reach the main menu.

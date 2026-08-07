@@ -11,7 +11,7 @@ so that commit, rather than GitHub fork metadata, is the comparison baseline.
 The project retains the original credits and license. Entries below describe
 Reborn work only; they do not claim authorship of inherited code or assets.
 
-## [Unreleased]
+## [0.4.0] - 2026-08-07
 
 ### Added - Android foundation
 
@@ -23,9 +23,10 @@ Reborn work only; they do not claim authorship of inherited code or assets.
 - Added touch/drag input through the existing 1024x768 logical canvas, Android
   Back handling and pause/resume lifecycle integration for audio, focus and
   redraws.
-- Added Android package validation, a Debug APK CI artifact and a physical
-  device acceptance checklist. Store signing and publication remain deferred
-  until the release candidate passes manual device testing.
+- Added Android package validation, an installable arm64 APK release artifact
+  and a physical-device acceptance checklist. The release candidate completed
+  an extended real-device gameplay pass; Play Store signing and publication
+  remain deferred.
 
 ## [0.3.0] - 2026-07-24
 

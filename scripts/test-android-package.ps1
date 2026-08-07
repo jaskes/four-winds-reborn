@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$Apk,
+    [string]$ExpectedVersionName = "0.4.0-dev",
     [switch]$AllowUnsigned
 )
 
@@ -21,7 +22,8 @@ $badging = (& $aapt dump badging $resolvedApk 2>&1) -join "`n"
 if($LASTEXITCODE -ne 0) {
     throw "aapt2 could not inspect $resolvedApk`n$badging"
 }
-if($badging -notmatch "package: name='com\.jaskes\.fourwindsreborn' versionCode='400' versionName='0\.4\.0-dev'") {
+$escapedVersionName = [regex]::Escape($ExpectedVersionName)
+if($badging -notmatch "package: name='com\.jaskes\.fourwindsreborn' versionCode='400' versionName='$escapedVersionName'") {
     throw "Unexpected Android package identity.`n$badging"
 }
 if($badging -notmatch "native-code: 'arm64-v8a'") {
