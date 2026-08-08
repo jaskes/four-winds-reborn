@@ -66,7 +66,9 @@ SDLActivity owns the native window and translates touch input into the same
 logical pointer events used on desktop. Android Back follows the existing
 secondary/system action path. App background/foreground events pause and
 resume audio, release input focus and force a redraw without advancing game
-state.
+state. Small legacy buttons receive Android-only touch slop: targets below 44
+logical pixels grow by at most 6 pixels per side without changing their art,
+layout, save data or desktop mouse behaviour.
 
 ## CI and acceptance
 
