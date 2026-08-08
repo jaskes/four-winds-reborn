@@ -73,6 +73,8 @@ Before merging a release, freeze its scope and complete all of the following:
    - switch windowed/fullscreen modes and resize the window;
    - complete a Rune Game hand, Adventure movement, a manual battle and the
      score/victory flow.
+   - start Quick, Duel and Coalition sessions; verify local-hand switching,
+     fixed allies, hostile targeting rules and team score summaries.
 
 Reborn may ship with `release` provenance status when the validator reports
 zero unclassified inherited live media and zero identical narrative fields.
@@ -85,7 +87,7 @@ validator must additionally report zero retained compatibility media.
 Package-neutral project assets may remain shared only when their exact paths
 are listed in `sharedIdenticalMedia`.
 
-For v0.4.0, Classic is the initial presentation and Reborn is an opt-in
+Classic is currently the initial presentation and Reborn is an opt-in
 release-status package. Reborn must not be labelled Preview solely because
 generic compatibility effects remain. Switching the initial presentation to
 Reborn is a separate product decision to make after README screenshots are
@@ -94,16 +96,16 @@ updated and player feedback has been reviewed.
 ## Tag and publish
 
 After the gate and owner smoke test pass, merge the complete integration branch
-into `main` as an explicit release commit. Replace `0.4.0` below with the
+into `main` as an explicit release commit. Replace `X.Y.Z` below with the
 version being published:
 
 ```bash
 git switch main
 git pull --ff-only origin main
-git merge --no-ff develop -m "release: v0.4.0"
+git merge --no-ff develop -m "release: vX.Y.Z"
 git push origin main
-git tag -a v0.4.0 -m "Four Winds Reborn v0.4.0"
-git push origin v0.4.0
+git tag -a vX.Y.Z -m "Four Winds Reborn vX.Y.Z"
+git push origin vX.Y.Z
 ```
 
 Push `main` before the tag. The accepted tag builds and tests Linux, macOS,

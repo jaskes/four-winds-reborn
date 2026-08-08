@@ -47,7 +47,7 @@ ABI, native libraries, assets and signing.
 The generated test package is copied to:
 
 ```text
-dist/android/four-winds-reborn-v0.4.0-dev-android-arm64-debug.apk
+dist/android/four-winds-reborn-v0.5.0-dev-android-arm64-debug.apk
 ```
 
 ## Runtime model
@@ -89,6 +89,8 @@ exact APK on a physical device:
 7. Background and resume during the menu, Rune Game and Adventure phases;
    verify audio resumes once and no turn advances while suspended.
 8. Kill the app from Android recents, relaunch and use Continue.
+9. Start Quick, Duel and Coalition games and verify small selectors, Pass and
+   compact Rune Game action buttons remain comfortable and accurate to tap.
 
 Any lifecycle, input-coordinate, storage or asset-discovery failure blocks the
 release even if CI is green.

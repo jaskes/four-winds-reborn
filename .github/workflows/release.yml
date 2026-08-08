@@ -217,7 +217,7 @@ jobs:
           apk=android/app/build/outputs/apk/debug/app-debug.apk
           aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
           version="${GITHUB_REF_NAME#v}"
-          "$aapt" dump badging "$apk" | grep -q "package: name='com.jaskes.fourwindsreborn' versionCode='400' versionName='$version'"
+          "$aapt" dump badging "$apk" | grep -q "package: name='com.jaskes.fourwindsreborn' versionCode='500' versionName='$version'"
           "$aapt" dump badging "$apk" | grep -q "native-code: 'arm64-v8a'"
           unzip -Z1 "$apk" > android-apk-contents.txt
           for library in SDL2 SDL2_image SDL2_mixer SDL2_ttf main; do

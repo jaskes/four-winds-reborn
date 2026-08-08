@@ -11,6 +11,36 @@ so that commit, rather than GitHub fork metadata, is the comparison baseline.
 The project retains the original credits and license. Entries below describe
 Reborn work only; they do not claim authorship of inherited code or assets.
 
+## [Unreleased] - planned v0.5.0
+
+### Added - local match modes and rulesets
+
+- Added a versioned match-topology contract independent from Rune Game rules,
+  persisted in saves, recovery checkpoints, replays and simulation artifacts.
+- Added the Quick ruleset, which plays only the East round while preserving
+  the existing four winds, hands and clan identities.
+- Added hot-seat Duel: Red and Purple share one local controller, while Yellow
+  and Aqua share the other. Both hands remain distinct and switch
+  automatically during the Rune Game.
+- Added Coalition: four controllers remain active, with fixed Red/Purple and
+  Yellow/Aqua teams sharing score and victory.
+- Added localized Match Mode and Rune Game Rules selectors to Settings.
+
+### Changed - topology-aware gameplay
+
+- Local ownership, AI decisions, hostile spell targeting, Adventure movement,
+  land occupation and score summaries now respect controller and team
+  topology. Allies cannot attack, target one another with hostile magic or
+  occupy each other's land.
+- Legacy data without topology metadata continues to load as versioned Classic
+  free for all; invalid or incompatible topology data is rejected explicitly.
+
+### Changed - Android ergonomics
+
+- Small legacy buttons now receive Android-only touch slop up to a 44-pixel
+  logical target without changing art, layout, saves or desktop mouse input.
+- Advanced the Android package contract to versionCode 500 for v0.5.x.
+
 ## [0.4.0] - 2026-08-07
 
 ### Added - Android foundation
