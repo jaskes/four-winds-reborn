@@ -15,6 +15,7 @@ class SettingsMenuScreen : public JsonWindow
     enum EntryKind
     {
         AIDifficulty,
+        RuneGameRules,
         Language,
         ContentPackage,
         GameSpeed,
@@ -42,6 +43,7 @@ class SettingsMenuScreen : public JsonWindow
     int                contentPackageIndex;
     std::string        gameSpeed;
     AI::Difficulty     aiDifficulty;
+    std::string        runeGameRuleset;
     int                musicVolume;
     int                effectsVolume;
     int                voiceVolume;

@@ -18,6 +18,8 @@
 constexpr const char RuneGameRulesetIdentityKey[] = "runeGameRuleset";
 constexpr const char ClassicRuneGameRulesetId[] = "classic";
 constexpr int ClassicRuneGameRulesetVersion = 1;
+constexpr const char QuickRuneGameRulesetId[] = "quick";
+constexpr int QuickRuneGameRulesetVersion = 1;
 
 enum class RuneGameCall
 {
@@ -98,6 +100,7 @@ struct RuneGameRulesetIdentity
 };
 
 const RuneGameRuleset & classicRuneGameRuleset(void);
+const RuneGameRuleset & quickRuneGameRuleset(void);
 const RuneGameRuleset & activeRuneGameRuleset(void);
 const RuneGameRuleset* findRuneGameRuleset(const std::string & id, int version);
 

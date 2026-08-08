@@ -14,7 +14,7 @@
 
 namespace
 {
-    class ClassicRuneGameRuleset final : public RuneGameRuleset
+    class ClassicRuneGameRuleset : public RuneGameRuleset
     {
     public:
         const std::string & id(void) const override
@@ -177,11 +177,48 @@ namespace
             return 500;
         }
     };
+
+    class QuickRuneGameRuleset final : public ClassicRuneGameRuleset
+    {
+    public:
+        const std::string & id(void) const override
+        {
+            static const std::string value(QuickRuneGameRulesetId);
+            return value;
+        }
+
+        int version(void) const override
+        {
+            return QuickRuneGameRulesetVersion;
+        }
+
+        RuneGameRoundAdvance advanceRound(int roundWindId, int partWindId) const override
+        {
+            // Quick keeps every Classic rule and all four hands, but ends after
+            // the East round. This makes it useful for short local matches and
+            // as an end-to-end proof that the versioned ruleset seam is real.
+            if(Wind::East == roundWindId && Wind::North == partWindId)
+            {
+                RuneGameRoundAdvance result;
+                result.roundWindId = roundWindId;
+                result.partWindId = partWindId;
+                result.complete = true;
+                return result;
+            }
+            return ClassicRuneGameRuleset::advanceRound(roundWindId, partWindId);
+        }
+    };
 }
 
 const RuneGameRuleset & classicRuneGameRuleset(void)
 {
     static const ClassicRuneGameRuleset ruleset;
+    return ruleset;
+}
+
+const RuneGameRuleset & quickRuneGameRuleset(void)
+{
+    static const QuickRuneGameRuleset ruleset;
     return ruleset;
 }
 
@@ -207,7 +244,12 @@ const RuneGameRuleset & activeRuneGameRuleset(void)
 const RuneGameRuleset* findRuneGameRuleset(const std::string & id, int version)
 {
     const RuneGameRuleset & classic = classicRuneGameRuleset();
-    return id == classic.id() && version == classic.version() ? &classic : nullptr;
+    if(id == classic.id() && version == classic.version()) return &classic;
+
+    const RuneGameRuleset & quick = quickRuneGameRuleset();
+    if(id == quick.id() && version == quick.version()) return &quick;
+
+    return nullptr;
 }
 
 RuneGameRulesetIdentity runeGameRulesetIdentity(const RuneGameRuleset & ruleset)

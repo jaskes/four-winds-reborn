@@ -1590,6 +1590,10 @@ msgstr "Английский"
 msgid "Classic"
 msgstr "Классика"
 
+#: src/ui/settingsmenu.cpp
+msgid "Quick"
+msgstr "Быстрая"
+
 #: src\settingsmenu.cpp:85
 msgid "Fast"
 msgstr "Быстро"
@@ -3245,6 +3249,10 @@ msgstr "КЛИК / ENTER: ПОДРОБНЫЙ СЧЁТ"
 #: src/settingsmenu.cpp
 msgid "AI Difficulty"
 msgstr "Сложность ИИ"
+
+#: src/ui/settingsmenu.cpp
+msgid "Rune Game Rules"
+msgstr "Правила игры рун"
 
 #: src/settingsmenu.cpp
 msgid "AI DIFFICULTY"

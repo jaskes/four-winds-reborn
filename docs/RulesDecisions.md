@@ -175,3 +175,24 @@ state is rejected before gameplay state changes. Old artifacts without this
 metadata resolve to `classic-ffa@1` only. As with ruleset and content-package
 identity, the separately validated topology field is omitted from replay state
 hashes so existing Classic deterministic hashes remain stable.
+
+## RD-009: Quick Rune Game ruleset
+
+Status: accepted on 2026-08-08.
+
+Quick Rune Game is identified as `quick@1`. It retains the complete Classic
+rules for the wall, legal calls, scoring, spell-point awards, four wind seats
+and seat rotation. Its only rules change is tournament length: it plays the
+four hands of the East round and finishes after the North hand instead of
+continuing through South, West and North rounds.
+
+The setting is a default for newly created games only. Once a match starts,
+its explicit ruleset identity is persisted in saves, recovery checkpoints and
+replays; changing Settings cannot silently convert that match. Existing and
+legacy games remain `classic@1` unless their artifact explicitly names an
+available alternative.
+
+Quick is the first production proof that the ruleset seam supports a real
+player-facing variant without changing Classic behavior. Regression coverage
+locks its registered identity, East-round completion point, settings
+persistence, legacy fallback and restoration of Classic as the default.

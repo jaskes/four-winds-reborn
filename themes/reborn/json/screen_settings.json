@@ -16,8 +16,8 @@
     "difficulty:area": [ 14, 86, 196, 540 ],
     "difficulty:portrait": [ 34, 140, 156, 156 ],
     "menu:area": [ 812, 176, 200, 510 ],
-    "menu:item_height": 42,
-    "menu:item_gap": 4,
+    "menu:item_height": 38,
+    "menu:item_gap": 3,
 
     "font:title": "dejavus40",
     "font:menu": "dejavus22",

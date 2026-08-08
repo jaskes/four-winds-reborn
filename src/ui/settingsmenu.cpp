@@ -59,6 +59,7 @@ SettingsMenuScreen::SettingsMenuScreen(const std::string & program) :
     language(Settings::language()), initialContentTheme(Settings::contentTheme()),
     contentPackageIndex(0), gameSpeed(Settings::gameSpeed()),
     aiDifficulty(Settings::aiDifficulty()),
+    runeGameRuleset(Settings::runeGameRuleset()),
     musicVolume(Settings::musicVolume()), effectsVolume(Settings::effectsVolume()),
     voiceVolume(Settings::voiceVolume()),
     guardianVoices(Settings::soundGuardianRules()),
@@ -119,6 +120,7 @@ SettingsMenuScreen::SettingsMenuScreen(const std::string & program) :
             contentPackageIndex = static_cast<int>(index);
 
     addEntry(AIDifficulty);
+    addEntry(RuneGameRules);
     addEntry(Language);
     addEntry(ContentPackage);
     addEntry(GameSpeed);
@@ -156,6 +158,7 @@ std::string SettingsMenuScreen::entryLabel(EntryKind kind) const
     switch(kind)
     {
         case AIDifficulty: return _("AI Difficulty");
+        case RuneGameRules: return _("Rune Game Rules");
         case Language: return _("Language");
         case ContentPackage: return _("Content Package");
         case GameSpeed: return _("Game Speed");
@@ -176,6 +179,7 @@ std::string SettingsMenuScreen::entryValue(EntryKind kind) const
     switch(kind)
     {
         case AIDifficulty: return difficultyLabel(aiDifficulty);
+        case RuneGameRules: return runeGameRuleset == "quick" ? _("Quick") : _("Classic");
         case Language: return language == "ru" ? _("Russian") : _("English");
         case ContentPackage:
             if(0 <= contentPackageIndex &&
@@ -371,6 +375,8 @@ bool SettingsMenuScreen::adjustSelected(int direction)
     if(kind == AIDifficulty)
         aiDifficulty = direction < 0 ? AI::previousDifficulty(aiDifficulty) :
                                       AI::nextDifficulty(aiDifficulty);
+    else if(kind == RuneGameRules)
+        runeGameRuleset = runeGameRuleset == "quick" ? "classic" : "quick";
     else if(isVolumeEntry(kind))
         setVolumeValue(kind, volumeValue(kind) + (direction < 0 ? -10 : 10));
     else if(kind == Language)
@@ -422,6 +428,7 @@ bool SettingsMenuScreen::activateSelected(void)
         case Language:
         case ContentPackage:
         case AIDifficulty:
+        case RuneGameRules:
         case GameSpeed:
         case MusicVolume:
         case EffectsVolume:
@@ -462,6 +469,7 @@ bool SettingsMenuScreen::activateSelected(void)
                 Settings::setContentTheme(contentPackages[contentPackageIndex].theme);
             Settings::setGameSpeed(gameSpeed);
             Settings::setAIDifficulty(aiDifficulty);
+            Settings::setRuneGameRuleset(runeGameRuleset);
             Settings::setMusicVolume(musicVolume);
             Settings::setEffectsVolume(effectsVolume);
             Settings::setVoiceVolume(voiceVolume);
@@ -574,6 +582,7 @@ bool SettingsMenuScreen::mouseClickEvent(const ButtonsEvent & coords)
                     case Language:
                     case ContentPackage:
                     case AIDifficulty:
+                    case RuneGameRules:
                     case GameSpeed:
                     case GuardianVoices:
                     case DisplayMode:

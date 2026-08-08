@@ -237,6 +237,29 @@ void testRuneGameRulesetIdentityContract()
            encodedClassic.getInteger("version") == ClassicRuneGameRulesetVersion,
            "Classic ruleset identity must have one stable JSON representation");
 
+    rulesetError.clear();
+    expect(selectActiveRuneGameRuleset(QuickRuneGameRulesetId,
+                                       QuickRuneGameRulesetVersion,
+                                       &rulesetError) && rulesetError.empty(),
+           "the registered Quick Rune Game ruleset must be selectable");
+    const RuneGameRulesetIdentity quickIdentity =
+        runeGameRulesetIdentity(activeRuneGameRuleset());
+    const JsonObject encodedQuick =
+        runeGameRulesetIdentityJson(activeRuneGameRuleset());
+    expect(quickIdentity.id == QuickRuneGameRulesetId &&
+           quickIdentity.version == QuickRuneGameRulesetVersion &&
+           encodedQuick.getString("id") == QuickRuneGameRulesetId &&
+           encodedQuick.getInteger("version") == QuickRuneGameRulesetVersion &&
+           findRuneGameRuleset(QuickRuneGameRulesetId,
+                               QuickRuneGameRulesetVersion) == &quickRuneGameRuleset(),
+           "Quick ruleset identity must have one stable registered representation");
+
+    rulesetError.clear();
+    expect(selectActiveRuneGameRuleset(ClassicRuneGameRulesetId,
+                                       ClassicRuneGameRulesetVersion,
+                                       &rulesetError) && rulesetError.empty(),
+           "ruleset identity tests must restore Classic as the active default");
+
     RuneGameRulesetIdentity resolved;
     const JsonObject legacyContainer;
     rulesetError.clear();
@@ -507,6 +530,7 @@ void testInstalledContentCatalog()
 void testRuneGameRoundFlowRuleset()
 {
     const RuneGameRuleset & classicRuleset = classicRuneGameRuleset();
+    const RuneGameRuleset & quickRuleset = quickRuneGameRuleset();
 
     RuneGameRoundAdvance advance = classicRuleset.advanceRound(Wind::None, Wind::None);
     expect(advance.roundWindId == Wind::East && advance.partWindId == Wind::East &&
@@ -527,6 +551,20 @@ void testRuneGameRoundFlowRuleset()
     advance = classicRuleset.advanceRound(Wind::North, Wind::North);
     expect(advance.complete,
            "Classic ruleset must finish after the North part of the North round");
+
+    advance = quickRuleset.advanceRound(Wind::None, Wind::None);
+    expect(advance.roundWindId == Wind::East && advance.partWindId == Wind::East &&
+           !advance.rotatePlayerWinds && !advance.complete &&
+           quickRuleset.firstTurnWindId() == Wind::East,
+           "Quick must preserve Classic opening-hand behavior");
+    advance = quickRuleset.advanceRound(Wind::East, Wind::East);
+    expect(advance.roundWindId == Wind::East && advance.partWindId == Wind::South &&
+           advance.rotatePlayerWinds && !advance.complete,
+           "Quick must preserve all four hands of the East round");
+    advance = quickRuleset.advanceRound(Wind::East, Wind::North);
+    expect(advance.roundWindId == Wind::East && advance.partWindId == Wind::North &&
+           !advance.rotatePlayerWinds && advance.complete,
+           "Quick must finish after the North hand of the East round");
 
     const AlternateRuneGameRuleset alternateRuleset;
     advance = alternateRuleset.advanceRound(Wind::None, Wind::None);
@@ -1606,6 +1644,7 @@ int runSettingsPersistenceSelfTest()
     Settings::setGameSpeed("fast");
     Settings::setContentTheme("alternate");
     Settings::setAIDifficulty(AI::Difficulty::Unfair);
+    Settings::setRuneGameRuleset("quick");
     Settings::setMusicVolume(35);
     Settings::setEffectsVolume(60);
     Settings::setVoiceVolume(85);
@@ -1628,6 +1667,7 @@ int runSettingsPersistenceSelfTest()
         return 1;
     }
     Settings::setAIDifficulty(AI::Difficulty::Easy);
+    Settings::setRuneGameRuleset("classic");
     Settings::setMusicVolume(100);
     Settings::setEffectsVolume(100);
     Settings::setVoiceVolume(100);
@@ -1637,6 +1677,7 @@ int runSettingsPersistenceSelfTest()
     if(!Settings::read() || Settings::language() != "ru" || Settings::gameSpeed() != "fast" ||
        Settings::contentTheme() != "alternate" ||
        Settings::aiDifficulty() != AI::Difficulty::Unfair ||
+       Settings::runeGameRuleset() != "quick" ||
        !Settings::music() || Settings::musicVolume() != 35 ||
        !Settings::sound() || Settings::effectsVolume() != 60 || Settings::voiceVolume() != 85 ||
        !Settings::soundGuardianRules() || !Settings::fullscreen() ||
@@ -1651,6 +1692,7 @@ int runSettingsPersistenceSelfTest()
        saved.getString("game:speed") != "fast" ||
        saved.getString("content:theme") != "alternate" ||
        saved.getString("ai:difficulty") != "unfair" ||
+       saved.getString("rune_game:ruleset") != "quick" ||
        !saved.getBoolean("music", false) || saved.getInteger("music:volume", -1) != 35 ||
        !saved.getBoolean("sound", false) || saved.getInteger("sound:volume", -1) != 60 ||
        saved.getInteger("voice:volume", -1) != 85 ||
@@ -1672,13 +1714,15 @@ int runSettingsPersistenceSelfTest()
        Settings::voiceVolume() != 0 || Settings::music() || Settings::sound() ||
        Settings::windowScale() != 100 ||
        Settings::contentTheme() != "classic" ||
-       Settings::aiDifficulty() != AI::Difficulty::Normal)
+       Settings::aiDifficulty() != AI::Difficulty::Normal ||
+       Settings::runeGameRuleset() != "classic")
     {
         std::cerr << "FAIL: legacy boolean audio settings are not load compatible\n";
         return 1;
     }
 
     Settings::setMusicVolume(-5);
+    Settings::setRuneGameRuleset("not-installed");
     Settings::setEffectsVolume(125);
     Settings::setVoiceVolume(50);
     Settings::setWindowScale(189);
@@ -1688,6 +1732,11 @@ int runSettingsPersistenceSelfTest()
        Settings::windowScale() != 200)
     {
         std::cerr << "FAIL: audio volume normalization is invalid\n";
+        return 1;
+    }
+    if(Settings::runeGameRuleset() != "classic")
+    {
+        std::cerr << "FAIL: unsupported Rune Game rulesets must normalize to Classic\n";
         return 1;
     }
 

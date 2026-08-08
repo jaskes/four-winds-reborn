@@ -50,6 +50,8 @@ namespace Settings
     std::string         preferredContentTheme(const std::string & fallback = "classic");
     AI::Difficulty      aiDifficulty(void);
     void                setAIDifficulty(AI::Difficulty);
+    std::string         runeGameRuleset(void);
+    void                setRuneGameRuleset(const std::string &);
     int                 presentationDelay(int);
 
     bool		read(void);
