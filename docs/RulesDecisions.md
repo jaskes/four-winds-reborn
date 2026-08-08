@@ -159,22 +159,30 @@ Status: accepted on 2026-08-08.
 
 Match topology is independent from the Rune Game ruleset. A ruleset defines
 how the rune wall, calls, scoring and round flow work; a topology defines how
-the four stable wind seats are assigned to controllers and competitive teams.
+the four stable clans are assigned to controllers and competitive teams. Wind
+is deliberately not used as ownership identity because seats rotate between
+Rune Game rounds while control and allegiance must remain stable.
 This separation lets Classic, Duel and Coalition reuse a compatible ruleset
 without embedding player ownership into Mahjong rules.
 
-Classic free-for-all is identified as `classic-ffa@1`: four wind seats, four
-controllers and four teams. Future Duel keeps four winds and clans but groups
-them under two controllers, while Coalition keeps four controllers and groups
-them into two teams. Those topologies require their own explicit versioned
-identities before they can enter production artifacts.
+Classic free-for-all is identified as `classic-ffa@1`: four clans, four
+controllers and four teams. Duel is `duel@1`: the Red and Purple clans share
+controller/team 0, while Yellow and Aqua share controller/team 1. The local
+player therefore controls two hands and two clans; the active local hand
+follows the Rune Game turn, and one discard-response window covers both local
+hands. Coalition is `coalition@1`: all four clans retain separate controllers,
+but Red/Purple and Yellow/Aqua are fixed allied teams. Allies do not attack,
+target one another with hostile spells or occupy each other's land; their
+scores are aggregated and they win or lose together.
 
 New saves, recovery metadata and action replays persist the active topology.
 An unavailable identity or a mismatch between an artifact and its embedded
 state is rejected before gameplay state changes. Old artifacts without this
 metadata resolve to `classic-ffa@1` only. As with ruleset and content-package
 identity, the separately validated topology field is omitted from replay state
-hashes so existing Classic deterministic hashes remain stable.
+hashes. The authoritative Classic hash changed once when ruleset/topology
+identity entered embedded game state and is locked by the fixed-seed replay
+test thereafter.
 
 ## RD-009: Quick Rune Game ruleset
 

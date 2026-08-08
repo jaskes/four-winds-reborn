@@ -60,6 +60,7 @@ SettingsMenuScreen::SettingsMenuScreen(const std::string & program) :
     contentPackageIndex(0), gameSpeed(Settings::gameSpeed()),
     aiDifficulty(Settings::aiDifficulty()),
     runeGameRuleset(Settings::runeGameRuleset()),
+    matchMode(Settings::matchMode()),
     musicVolume(Settings::musicVolume()), effectsVolume(Settings::effectsVolume()),
     voiceVolume(Settings::voiceVolume()),
     guardianVoices(Settings::soundGuardianRules()),
@@ -121,6 +122,7 @@ SettingsMenuScreen::SettingsMenuScreen(const std::string & program) :
 
     addEntry(AIDifficulty);
     addEntry(RuneGameRules);
+    addEntry(MatchMode);
     addEntry(Language);
     addEntry(ContentPackage);
     addEntry(GameSpeed);
@@ -159,6 +161,7 @@ std::string SettingsMenuScreen::entryLabel(EntryKind kind) const
     {
         case AIDifficulty: return _("AI Difficulty");
         case RuneGameRules: return _("Rune Game Rules");
+        case MatchMode: return _("Match Mode");
         case Language: return _("Language");
         case ContentPackage: return _("Content Package");
         case GameSpeed: return _("Game Speed");
@@ -180,6 +183,10 @@ std::string SettingsMenuScreen::entryValue(EntryKind kind) const
     {
         case AIDifficulty: return difficultyLabel(aiDifficulty);
         case RuneGameRules: return runeGameRuleset == "quick" ? _("Quick") : _("Classic");
+        case MatchMode:
+            if(matchMode == "duel") return _("Duel");
+            if(matchMode == "coalition") return _("Coalition");
+            return _("Free for All");
         case Language: return language == "ru" ? _("Russian") : _("English");
         case ContentPackage:
             if(0 <= contentPackageIndex &&
@@ -377,6 +384,15 @@ bool SettingsMenuScreen::adjustSelected(int direction)
                                       AI::nextDifficulty(aiDifficulty);
     else if(kind == RuneGameRules)
         runeGameRuleset = runeGameRuleset == "quick" ? "classic" : "quick";
+    else if(kind == MatchMode)
+    {
+        static const std::vector<std::string> modes = { "classic", "duel", "coalition" };
+        auto it = std::find(modes.begin(), modes.end(), matchMode);
+        int index = it == modes.end() ? 0 : static_cast<int>(std::distance(modes.begin(), it));
+        index = (index + (direction < 0 ? -1 : 1) + static_cast<int>(modes.size())) %
+                static_cast<int>(modes.size());
+        matchMode = modes[index];
+    }
     else if(isVolumeEntry(kind))
         setVolumeValue(kind, volumeValue(kind) + (direction < 0 ? -10 : 10));
     else if(kind == Language)
@@ -429,6 +445,7 @@ bool SettingsMenuScreen::activateSelected(void)
         case ContentPackage:
         case AIDifficulty:
         case RuneGameRules:
+        case MatchMode:
         case GameSpeed:
         case MusicVolume:
         case EffectsVolume:
@@ -470,6 +487,7 @@ bool SettingsMenuScreen::activateSelected(void)
             Settings::setGameSpeed(gameSpeed);
             Settings::setAIDifficulty(aiDifficulty);
             Settings::setRuneGameRuleset(runeGameRuleset);
+            Settings::setMatchMode(matchMode);
             Settings::setMusicVolume(musicVolume);
             Settings::setEffectsVolume(effectsVolume);
             Settings::setVoiceVolume(voiceVolume);

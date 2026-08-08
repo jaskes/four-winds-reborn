@@ -1188,6 +1188,9 @@ struct LocalPlayers : public std::vector<LocalPlayer>
     LocalPlayer*		playerOfAvatar(const Avatar &);
     LocalPlayer*		playerOfClan(const Clan &);
     LocalPlayer*		playerOfWind(const Wind &);
+    const LocalPlayer*          playerOfAvatar(const Avatar &) const;
+    const LocalPlayer*          playerOfClan(const Clan &) const;
+    const LocalPlayer*          playerOfWind(const Wind &) const;
 
     JsonArray			toJsonArray(void) const;
     static LocalPlayers		fromJsonArray(const JsonArray &);

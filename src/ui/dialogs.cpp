@@ -1682,6 +1682,13 @@ TargetPlayerDialog::TargetPlayerDialog(const LocalData & ld, Window & win)
     buttonTargetRight.setPosition(GameTheme::jsonPoint(jobject, "offset:target_right"));
     buttonTargetTop.setPosition(GameTheme::jsonPoint(jobject, "offset:target_top"));
 
+    // Player-targeted control spells describe an opponent, not merely another
+    // seat. Fixed-team topologies therefore keep the allied seat visible for
+    // orientation, but make it impossible to select as a hostile target.
+    buttonTargetLeft.setDisabled(GameData::allied(ld.myPlayer(), ld.remoteLeft()));
+    buttonTargetRight.setDisabled(GameData::allied(ld.myPlayer(), ld.remoteRight()));
+    buttonTargetTop.setDisabled(GameData::allied(ld.myPlayer(), ld.remoteTop()));
+
     signalSubscribe(buttonTargetLeft, Signal::ButtonClicked);
     signalSubscribe(buttonTargetRight, Signal::ButtonClicked);
     signalSubscribe(buttonTargetTop, Signal::ButtonClicked);

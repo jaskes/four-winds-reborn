@@ -1,8 +1,10 @@
 #include "matchscore.h"
 
 #include <algorithm>
+#include <map>
 
 #include "gamedata.h"
+#include "matchtopology.h"
 
 namespace
 {
@@ -36,7 +38,7 @@ MatchScore::PlayerInput MatchScore::observe(const RemotePlayer & player)
     for(const auto clanId : clans_all)
     {
         const Clan clan(clanId);
-        if(clan != player.clan)
+        if(clan != player.clan && !GameData::allied(clan, player.clan))
             input.scores[index(Category::LandClaims)] +=
                 std::max(0, player.landClaimPoints(clan));
     }
@@ -45,6 +47,12 @@ MatchScore::PlayerInput MatchScore::observe(const RemotePlayer & player)
 }
 
 MatchScore::Results MatchScore::calculate(const std::vector<PlayerInput> & inputs)
+{
+    return calculate(inputs, classicFreeForAllTopology());
+}
+
+MatchScore::Results MatchScore::calculate(const std::vector<PlayerInput> & inputs,
+                                          const MatchTopology & topology)
 {
     Results results(inputs.size());
     if(inputs.empty()) return results;
@@ -74,11 +82,24 @@ MatchScore::Results MatchScore::calculate(const std::vector<PlayerInput> & input
         }
     }
 
-    std::vector<int> totals;
-    totals.reserve(results.size());
-    for(const PlayerResult & player : results) totals.push_back(player.totalScore);
+    std::map<int, int> teamTotals;
     for(PlayerResult & player : results)
-        player.finalRank = competitionRank(totals, player.totalScore);
+    {
+        player.teamId = topology.teamForClan(player.person.clan());
+        if(player.teamId < 0)
+            player.teamId = static_cast<int>(teamTotals.size());
+        teamTotals[player.teamId] += player.totalScore;
+    }
+
+    std::vector<int> totals;
+    totals.reserve(teamTotals.size());
+    for(const auto & team : teamTotals) totals.push_back(team.second);
+    for(PlayerResult & player : results)
+    {
+        player.teamScore = teamTotals[player.teamId];
+        player.teamRank = competitionRank(totals, player.teamScore);
+        player.finalRank = player.teamRank;
+    }
 
     return results;
 }
@@ -97,7 +118,7 @@ MatchScore::Results MatchScore::current(void)
         if(player != players.end()) inputs.push_back(observe(*player));
     }
 
-    return calculate(inputs);
+    return calculate(inputs, activeMatchTopology());
 }
 
 std::vector<std::size_t> MatchScore::winnerIndices(const Results & results)

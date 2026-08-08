@@ -35,6 +35,74 @@ namespace
         {
             return controllerForWind(windId);
         }
+
+        int controllerForClan(int clanId) const override
+        {
+            return Clan::Red <= clanId && clanId <= Clan::Purple ? clanId - Clan::Red : -1;
+        }
+
+        int teamForClan(int clanId) const override { return controllerForClan(clanId); }
+    };
+
+    // East/South own the western Red/Purple half of the island, while
+    // West/North own the eastern Yellow/Aqua half. Player generation keeps
+    // those clan pairs on the corresponding wind pair.
+    int halfForWind(int windId)
+    {
+        if(windId == Wind::East || windId == Wind::South) return 0;
+        if(windId == Wind::West || windId == Wind::North) return 1;
+        return -1;
+    }
+
+    int halfForClan(int clanId)
+    {
+        if(clanId == Clan::Red || clanId == Clan::Purple) return 0;
+        if(clanId == Clan::Yellow || clanId == Clan::Aqua) return 1;
+        return -1;
+    }
+
+    class DuelTopology final : public MatchTopology
+    {
+    public:
+        const std::string & id(void) const override
+        {
+            static const std::string value(DuelTopologyId);
+            return value;
+        }
+
+        int version(void) const override { return DuelTopologyVersion; }
+        int seatCount(void) const override { return 4; }
+        int controllerCount(void) const override { return 2; }
+        int teamCount(void) const override { return 2; }
+        int controllerForWind(int windId) const override { return halfForWind(windId); }
+        int teamForWind(int windId) const override { return halfForWind(windId); }
+        int controllerForClan(int clanId) const override { return halfForClan(clanId); }
+        int teamForClan(int clanId) const override { return halfForClan(clanId); }
+    };
+
+    class CoalitionTopology final : public MatchTopology
+    {
+    public:
+        const std::string & id(void) const override
+        {
+            static const std::string value(CoalitionTopologyId);
+            return value;
+        }
+
+        int version(void) const override { return CoalitionTopologyVersion; }
+        int seatCount(void) const override { return 4; }
+        int controllerCount(void) const override { return 4; }
+        int teamCount(void) const override { return 2; }
+        int controllerForWind(int windId) const override
+        {
+            return Wind::East <= windId && windId <= Wind::North ? windId - Wind::East : -1;
+        }
+        int teamForWind(int windId) const override { return halfForWind(windId); }
+        int controllerForClan(int clanId) const override
+        {
+            return Clan::Red <= clanId && clanId <= Clan::Purple ? clanId - Clan::Red : -1;
+        }
+        int teamForClan(int clanId) const override { return halfForClan(clanId); }
     };
 
     const MatchTopology*& selectedMatchTopology(void)
@@ -61,9 +129,33 @@ bool MatchTopology::allied(int firstWindId, int secondWindId) const
     return 0 <= first && first == teamForWind(secondWindId);
 }
 
+bool MatchTopology::sharesControllerByClan(int firstClanId, int secondClanId) const
+{
+    const int first = controllerForClan(firstClanId);
+    return 0 <= first && first == controllerForClan(secondClanId);
+}
+
+bool MatchTopology::alliedByClan(int firstClanId, int secondClanId) const
+{
+    const int first = teamForClan(firstClanId);
+    return 0 <= first && first == teamForClan(secondClanId);
+}
+
 const MatchTopology & classicFreeForAllTopology(void)
 {
     static const ClassicFreeForAllTopology topology;
+    return topology;
+}
+
+const MatchTopology & duelTopology(void)
+{
+    static const DuelTopology topology;
+    return topology;
+}
+
+const MatchTopology & coalitionTopology(void)
+{
+    static const CoalitionTopology topology;
     return topology;
 }
 
@@ -75,7 +167,12 @@ const MatchTopology & activeMatchTopology(void)
 const MatchTopology* findMatchTopology(const std::string & id, int version)
 {
     const MatchTopology & classic = classicFreeForAllTopology();
-    return id == classic.id() && version == classic.version() ? &classic : nullptr;
+    if(id == classic.id() && version == classic.version()) return &classic;
+    const MatchTopology & duel = duelTopology();
+    if(id == duel.id() && version == duel.version()) return &duel;
+    const MatchTopology & coalition = coalitionTopology();
+    if(id == coalition.id() && version == coalition.version()) return &coalition;
+    return nullptr;
 }
 
 MatchTopologyIdentity matchTopologyIdentity(const MatchTopology & topology)

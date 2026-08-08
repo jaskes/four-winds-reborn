@@ -3254,6 +3254,26 @@ msgstr "Сложность ИИ"
 msgid "Rune Game Rules"
 msgstr "Правила игры рун"
 
+#: src/ui/settingsmenu.cpp
+msgid "Match Mode"
+msgstr "Режим матча"
+
+#: src/ui/settingsmenu.cpp
+msgid "Free for All"
+msgstr "Каждый за себя"
+
+#: src/ui/settingsmenu.cpp
+msgid "Duel"
+msgstr "Дуэль"
+
+#: src/ui/settingsmenu.cpp
+msgid "Coalition"
+msgstr "Коалиция"
+
+#: src/ui/gamesummarypart.cpp
+msgid "Team score: %1"
+msgstr "Счёт команды: %1"
+
 #: src/settingsmenu.cpp
 msgid "AI DIFFICULTY"
 msgstr "СЛОЖНОСТЬ ИИ"

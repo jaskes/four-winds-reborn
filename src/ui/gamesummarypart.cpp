@@ -29,6 +29,7 @@
 #include "gametheme.h"
 #include "gamesummarypart.h"
 #include "matchscore.h"
+#include "matchtopology.h"
 
 namespace
 {
@@ -154,7 +155,12 @@ GameSummaryScreen::GameSummaryScreen() : JsonWindow("screen_game_summary.json", 
         summaryWinners.font = "dejavus20";
     summaryDetails = GameTheme::jsonTextInfo(jobject, "textinfo:summary_details");
     if(!winners.empty() && winners.front() < scores.size())
-        summaryDetails.text = StringFormat(_("Final score: %1")).arg(scores[winners.front()].totalScore);
+    {
+        const MatchScore::PlayerResult & winner = scores[winners.front()];
+        summaryDetails.text = activeMatchTopology().teamCount() < activeMatchTopology().seatCount() ?
+            StringFormat(_("Team score: %1")).arg(winner.teamScore) :
+            StringFormat(_("Final score: %1")).arg(winner.totalScore);
+    }
     summaryPortraitArea = GameTheme::jsonRect(jobject, "area:summary_portraits");
     summaryWinnerArea = GameTheme::jsonRect(jobject, "area:summary_winner");
 
@@ -240,7 +246,9 @@ void GameSummaryScreen::updateVictoryPage(void)
     }
     victoryTitle.text = winners.size() > 1 ? _("JOINT VICTORY") : _("VICTORY");
     victoryName.text = winner.person.name();
-    victoryDetails.text = StringFormat(_("Final score: %1")).arg(winner.totalScore);
+    victoryDetails.text = activeMatchTopology().teamCount() < activeMatchTopology().seatCount() ?
+        StringFormat(_("Team score: %1")).arg(winner.teamScore) :
+        StringFormat(_("Final score: %1")).arg(winner.totalScore);
     victoryWinners.text = winners.size() > 1 ?
         StringFormat(_("Winners: %1")).arg(winnerNames()) : std::string();
     victoryHint.text = winnerPage + 1 < winners.size() ?

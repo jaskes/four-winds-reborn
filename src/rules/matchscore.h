@@ -7,6 +7,8 @@
 
 #include "gameobjects.h"
 
+class MatchTopology;
+
 namespace MatchScore
 {
     enum class Category : std::size_t
@@ -40,6 +42,9 @@ namespace MatchScore
         std::array<CategoryResult, CategoryCount> categories{};
         int totalScore = 0;
         int finalRank = 0;
+        int teamId = -1;
+        int teamScore = 0;
+        int teamRank = 0;
     };
 
     using Results = std::vector<PlayerResult>;
@@ -51,6 +56,7 @@ namespace MatchScore
 
     PlayerInput observe(const RemotePlayer &);
     Results calculate(const std::vector<PlayerInput> &);
+    Results calculate(const std::vector<PlayerInput> &, const MatchTopology &);
     Results current(void);
     std::vector<std::size_t> winnerIndices(const Results &);
 }

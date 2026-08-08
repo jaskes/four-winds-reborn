@@ -547,7 +547,7 @@ bool GameData::clientCastSpell(const Avatar & avatar, const ClientMessage & act,
 	DEBUG(client.toString() << ", " << "spell: " << spell.toString() << ", " << "target: " << target.toString());
 	LocalPlayer* targetPlayer = gamers.playerOfAvatar(target);
 
-	if(! targetPlayer || target == client.avatar)
+	if(! targetPlayer || target == client.avatar || GameData::allied(*targetPlayer, client))
 	{
 	    ERROR("other player target invalid: " << target.toString());
 	    return rejectAction(ActionRejectReason::InvalidTarget);
@@ -596,7 +596,7 @@ bool GameData::clientCastSpell(const Avatar & avatar, const ClientMessage & act,
 	if(spellInfo.target() & SpellTarget::Party)
 	{
 	    BattleParty* party = 0 < unit ? getBattleParty(unit) : nullptr;
-	    const bool friendly = party && party->clan() == client.clan;
+	    const bool friendly = party && GameData::allied(party->clan(), client.clan);
 	    const bool allowed = party && party->land() == land &&
 		(((spellInfo.target() & SpellTarget::Friendly) && friendly) ||
 		 ((spellInfo.target() & SpellTarget::Enemy) && !friendly));
@@ -614,7 +614,7 @@ bool GameData::clientCastSpell(const Avatar & avatar, const ClientMessage & act,
 	{
 	    BattleCreature* bcr = getBattleCreature(unit);
 	    BattleParty* party = getBattleParty(unit);
-	    const bool friendly = bcr && bcr->clan() == client.clan;
+	    const bool friendly = bcr && GameData::allied(bcr->clan(), client.clan);
 	    const bool allowed = bcr && party && party->land() == land && bcr->canReceiveSpell(spell) &&
 		(((spellInfo.target() & SpellTarget::Friendly) && friendly) ||
 		 ((spellInfo.target() & SpellTarget::Enemy) && !friendly));

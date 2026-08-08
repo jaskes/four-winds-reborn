@@ -345,10 +345,16 @@ namespace GameData
     const Person &		myPerson(void);
     const Person &              currentPerson(void);
     const LocalPlayers &        players(void);
+    Avatar                      localMahjongAvatar(void);
+    Avatar                      localAdventureAvatar(void);
 
     AI::Difficulty              aiDifficulty(void);
     void                        setAIDifficulty(AI::Difficulty);
     bool                        usesAI(const Person &);
+    bool                        isLocallyControlled(const Person &);
+    bool                        allied(const Person &, const Person &);
+    bool                        allied(const Clan &, const Clan &);
+    int                         localControllerId(void);
     bool                        developerAssisted(void);
 
 #ifdef BUILD_DEBUG

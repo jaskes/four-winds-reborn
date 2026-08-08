@@ -312,7 +312,9 @@ void testMatchTopologyIdentityContract()
            classic.controllerForWind(Wind::East) == 0 &&
            classic.controllerForWind(Wind::North) == 3 &&
            classic.teamForWind(Wind::East) == 0 &&
-           classic.teamForWind(Wind::North) == 3,
+           classic.teamForWind(Wind::North) == 3 &&
+           classic.controllerForClan(Clan::Red) == 0 &&
+           classic.controllerForClan(Clan::Purple) == 3,
            "Classic topology identity and four independent seats must remain stable");
     expect(classic.sharesController(Wind::East, Wind::East) &&
            !classic.sharesController(Wind::East, Wind::South) &&
@@ -320,8 +322,40 @@ void testMatchTopologyIdentityContract()
            !classic.allied(Wind::West, Wind::North) &&
            classic.controllerForWind(Wind::None) == -1 &&
            classic.teamForWind(99) == -1 &&
-           !classic.allied(Wind::None, Wind::None),
+           !classic.allied(Wind::None, Wind::None) &&
+           !classic.alliedByClan(Clan::Red, Clan::Purple),
            "Classic topology must not silently group distinct or invalid winds");
+
+    const MatchTopology & duel = duelTopology();
+    expect(duel.id() == DuelTopologyId && duel.version() == DuelTopologyVersion &&
+           duel.seatCount() == 4 && duel.controllerCount() == 2 &&
+           duel.teamCount() == 2 &&
+           duel.sharesController(Wind::East, Wind::South) &&
+           duel.sharesController(Wind::West, Wind::North) &&
+           !duel.sharesController(Wind::East, Wind::West) &&
+           duel.allied(Wind::East, Wind::South) &&
+           !duel.allied(Wind::South, Wind::North) &&
+           duel.sharesControllerByClan(Clan::Red, Clan::Purple) &&
+           duel.sharesControllerByClan(Clan::Yellow, Clan::Aqua) &&
+           !duel.sharesControllerByClan(Clan::Red, Clan::Yellow) &&
+           findMatchTopology(DuelTopologyId, DuelTopologyVersion) == &duel,
+           "Duel topology must expose two controllers that each own one island half");
+
+    const MatchTopology & coalition = coalitionTopology();
+    expect(coalition.id() == CoalitionTopologyId &&
+           coalition.version() == CoalitionTopologyVersion &&
+           coalition.seatCount() == 4 && coalition.controllerCount() == 4 &&
+           coalition.teamCount() == 2 &&
+           !coalition.sharesController(Wind::East, Wind::South) &&
+           coalition.allied(Wind::East, Wind::South) &&
+           coalition.allied(Wind::West, Wind::North) &&
+           !coalition.allied(Wind::East, Wind::West) &&
+           coalition.alliedByClan(Clan::Red, Clan::Purple) &&
+           coalition.alliedByClan(Clan::Yellow, Clan::Aqua) &&
+           !coalition.alliedByClan(Clan::Red, Clan::Yellow) &&
+           !coalition.sharesControllerByClan(Clan::Red, Clan::Purple) &&
+           findMatchTopology(CoalitionTopologyId, CoalitionTopologyVersion) == &coalition,
+           "Coalition topology must keep four controllers while pairing their teams");
 
     MatchTopologyIdentity resolved;
     const JsonObject legacyContainer;
@@ -1561,7 +1595,7 @@ void testDeveloperFastForward()
 int runFixedSeedReplaySelfTest(const std::string & replayDirectory = std::string())
 {
     constexpr uint64_t seed = UINT64_C(0x123456789abcdef);
-    constexpr const char* expectedHash = "5f1012c76a1d1638";
+    constexpr const char* expectedHash = "8fade71f0243bc4a";
 
     GameplayRng::seed(seed);
     GameData::initPersons(Person(Avatar::Nucrus, Clan::Red, Wind::East));
@@ -1645,6 +1679,7 @@ int runSettingsPersistenceSelfTest()
     Settings::setContentTheme("alternate");
     Settings::setAIDifficulty(AI::Difficulty::Unfair);
     Settings::setRuneGameRuleset("quick");
+    Settings::setMatchMode("coalition");
     Settings::setMusicVolume(35);
     Settings::setEffectsVolume(60);
     Settings::setVoiceVolume(85);
@@ -1668,6 +1703,7 @@ int runSettingsPersistenceSelfTest()
     }
     Settings::setAIDifficulty(AI::Difficulty::Easy);
     Settings::setRuneGameRuleset("classic");
+    Settings::setMatchMode("classic");
     Settings::setMusicVolume(100);
     Settings::setEffectsVolume(100);
     Settings::setVoiceVolume(100);
@@ -1678,6 +1714,7 @@ int runSettingsPersistenceSelfTest()
        Settings::contentTheme() != "alternate" ||
        Settings::aiDifficulty() != AI::Difficulty::Unfair ||
        Settings::runeGameRuleset() != "quick" ||
+       Settings::matchMode() != "coalition" ||
        !Settings::music() || Settings::musicVolume() != 35 ||
        !Settings::sound() || Settings::effectsVolume() != 60 || Settings::voiceVolume() != 85 ||
        !Settings::soundGuardianRules() || !Settings::fullscreen() ||
@@ -1693,6 +1730,7 @@ int runSettingsPersistenceSelfTest()
        saved.getString("content:theme") != "alternate" ||
        saved.getString("ai:difficulty") != "unfair" ||
        saved.getString("rune_game:ruleset") != "quick" ||
+       saved.getString("match:mode") != "coalition" ||
        !saved.getBoolean("music", false) || saved.getInteger("music:volume", -1) != 35 ||
        !saved.getBoolean("sound", false) || saved.getInteger("sound:volume", -1) != 60 ||
        saved.getInteger("voice:volume", -1) != 85 ||
@@ -1715,7 +1753,8 @@ int runSettingsPersistenceSelfTest()
        Settings::windowScale() != 100 ||
        Settings::contentTheme() != "classic" ||
        Settings::aiDifficulty() != AI::Difficulty::Normal ||
-       Settings::runeGameRuleset() != "classic")
+       Settings::runeGameRuleset() != "classic" ||
+       Settings::matchMode() != "classic")
     {
         std::cerr << "FAIL: legacy boolean audio settings are not load compatible\n";
         return 1;
@@ -1723,6 +1762,7 @@ int runSettingsPersistenceSelfTest()
 
     Settings::setMusicVolume(-5);
     Settings::setRuneGameRuleset("not-installed");
+    Settings::setMatchMode("not-installed");
     Settings::setEffectsVolume(125);
     Settings::setVoiceVolume(50);
     Settings::setWindowScale(189);
@@ -1737,6 +1777,11 @@ int runSettingsPersistenceSelfTest()
     if(Settings::runeGameRuleset() != "classic")
     {
         std::cerr << "FAIL: unsupported Rune Game rulesets must normalize to Classic\n";
+        return 1;
+    }
+    if(Settings::matchMode() != "classic")
+    {
+        std::cerr << "FAIL: unsupported match modes must normalize to Classic\n";
         return 1;
     }
 
@@ -2775,6 +2820,80 @@ void testSpellCastingAI()
 
     expect(!AI::spellCastCommand(AI::SpellCastPlan()).spell().isValid(),
            "an empty spell plan must convert safely without indexing spell data");
+}
+
+void testCoalitionPlayerSpellTargets()
+{
+    std::string topologyError;
+    expect(selectActiveMatchTopology(CoalitionTopologyId, CoalitionTopologyVersion,
+                                     &topologyError),
+           "Coalition spell-target fixture must select the Coalition topology");
+
+    GameData::gamers.clear();
+
+    LocalPlayer caster;
+    caster.avatar = Avatar::Orachi;
+    caster.clan = Clan::Red;
+    caster.wind = Wind::East;
+    caster.points = 1000;
+    BattleParty grantedSpell(caster.clan, Land::Corzen);
+    expect(grantedSpell.join(BattleCreature(caster.clan, Creature::AirElemental, 2980)),
+           "Coalition spell-target fixture must grant Silence through an Air Elemental");
+    caster.army.push_back(grantedSpell);
+    for(const Stone & stone : GameData::spellInfo(Spell(Spell::Silence)).stones)
+        caster.stones.add(GameStone(stone, false));
+
+    LocalPlayer ally;
+    ally.avatar = Avatar::Dayla;
+    ally.clan = Clan::Purple;
+    ally.wind = Wind::South;
+
+    LocalPlayer enemy;
+    enemy.avatar = Avatar::Lakkho;
+    enemy.clan = Clan::Yellow;
+    enemy.wind = Wind::West;
+
+    LocalPlayer secondEnemy;
+    secondEnemy.avatar = Avatar::Ziag;
+    secondEnemy.clan = Clan::Aqua;
+    secondEnemy.wind = Wind::North;
+
+    GameData::gamers.push_back(caster);
+    GameData::gamers.push_back(ally);
+    GameData::gamers.push_back(enemy);
+    GameData::gamers.push_back(secondEnemy);
+    GameData::currentWind = Wind::East;
+
+    ActionList alliedActions;
+    ActionRejection alliedRejection;
+    expect(!GameData::client2Mahjong(caster.avatar,
+                                     ClientCastSpell(Spell(Spell::Silence), ally.avatar),
+                                     alliedActions, &alliedRejection) &&
+           alliedActions.empty() &&
+           alliedRejection.reason == ActionRejectReason::InvalidTarget &&
+           !GameData::gamers[1].isSilenced(),
+           "Coalition must reject an offensive player spell aimed at an ally");
+
+    const AI::SpellCastPlan aiChoice = AI::chooseSpellCast(
+        GameData::gamers.front(), spellSet({ Spell::Silence }),
+        AI::BehaviorProfile::Control);
+    const LocalPlayer* aiTarget = GameData::gamers.playerOfAvatar(aiChoice.target);
+    expect(aiChoice.isValid() && aiTarget &&
+           !GameData::allied(GameData::gamers.front(), *aiTarget),
+           "Coalition spell AI must choose an enemy rather than its allied seat");
+
+    ActionList enemyActions;
+    expect(GameData::client2Mahjong(caster.avatar,
+                                    ClientCastSpell(Spell(Spell::Silence), enemy.avatar),
+                                    enemyActions) &&
+           !enemyActions.empty() && GameData::gamers[2].isSilenced(),
+           "Coalition must still accept an offensive player spell aimed at an enemy");
+
+    GameData::gamers.clear();
+    expect(selectActiveMatchTopology(ClassicFreeForAllTopologyId,
+                                     ClassicFreeForAllTopologyVersion,
+                                     &topologyError),
+           "Coalition spell-target tests must restore Classic free-for-all");
 }
 
 void testAdventureProfiles()
@@ -4488,6 +4607,136 @@ void testMatchScoreContract()
     const MatchScore::Results tiedScores = MatchScore::calculate(inputs);
     expect(MatchScore::winnerIndices(tiedScores) == std::vector<std::size_t>({ 0, 1 }),
            "winner selection must preserve every tied first-place player");
+
+    const MatchScore::Results duelScores = MatchScore::calculate(inputs, duelTopology());
+    expect(duelScores.size() == 4, "duel score must retain all four hands");
+    if(duelScores.size() == 4)
+    {
+        expect(duelScores[0].teamId == duelScores[3].teamId &&
+               duelScores[1].teamId == duelScores[2].teamId &&
+               duelScores[0].teamId != duelScores[1].teamId,
+               "duel score must pair stable island-half clans despite wind order");
+        expect(duelScores[0].teamScore == duelScores[3].teamScore &&
+               duelScores[1].teamScore == duelScores[2].teamScore,
+               "duel partners must share one aggregate team score");
+        expect(duelScores[0].finalRank == duelScores[3].finalRank &&
+               duelScores[1].finalRank == duelScores[2].finalRank,
+               "duel partners must share one final rank");
+        const std::vector<std::size_t> duelWinners = MatchScore::winnerIndices(duelScores);
+        expect(duelWinners == std::vector<std::size_t>({ 1, 2 }),
+               "duel victory must include both hands of the winning controller");
+    }
+
+    const MatchScore::Results coalitionScores =
+        MatchScore::calculate(inputs, coalitionTopology());
+    expect(coalitionScores.size() == 4,
+           "coalition score must retain all four independent players");
+    if(coalitionScores.size() == 4)
+    {
+        expect(coalitionScores[0].teamId == coalitionScores[3].teamId &&
+               coalitionScores[1].teamId == coalitionScores[2].teamId &&
+               coalitionScores[0].teamId != coalitionScores[1].teamId,
+               "coalition score must pair stable island-half clans despite wind order");
+        expect(coalitionScores[0].teamScore == coalitionScores[3].teamScore &&
+               coalitionScores[1].teamScore == coalitionScores[2].teamScore,
+               "coalition allies must share one aggregate team score");
+        expect(MatchScore::winnerIndices(coalitionScores) ==
+                   std::vector<std::size_t>({ 1, 2 }),
+               "coalition victory must include both players on the winning team");
+    }
+}
+
+void testMatchTopologyRuntimeContract()
+{
+    std::string topologyError;
+    expect(selectActiveMatchTopology(DuelTopologyId, DuelTopologyVersion,
+                                     &topologyError),
+           "Duel runtime fixture must select the Duel topology");
+    GameplayRng::seed(UINT64_C(0x15d0e1));
+    GameData::initPersons(Person(Avatar::Nucrus, Clan::Red, Wind::East));
+    expect(GameData::initMahjong(), "Duel runtime fixture must initialize Rune Game");
+
+    const Person & duelHuman = GameData::myPerson();
+    int duelLocalSeats = 0;
+    int duelAiSeats = 0;
+    for(const Person & player : GameData::players())
+    {
+        if(GameData::isLocallyControlled(player)) ++duelLocalSeats;
+        if(GameData::usesAI(player)) ++duelAiSeats;
+    }
+    const Person* duelPartner = nullptr;
+    for(const Person & player : GameData::players())
+    {
+        if(player.avatar != duelHuman.avatar &&
+           GameData::isLocallyControlled(player))
+        {
+            duelPartner = &player;
+            break;
+        }
+    }
+    expect(duelHuman.wind.isValid() && duelLocalSeats == 2 && duelAiSeats == 2 &&
+           duelPartner && GameData::allied(duelHuman, *duelPartner) &&
+           !GameData::usesAI(*duelPartner),
+           "Duel must expose both allied hands to one local controller");
+    if(duelPartner)
+    {
+        Person rotatedHuman = duelHuman;
+        Person rotatedPartner = *duelPartner;
+        rotatedHuman.shiftWind();
+        rotatedPartner.shiftWind();
+        expect(GameData::allied(rotatedHuman, rotatedPartner) &&
+               activeMatchTopology().sharesControllerByClan(rotatedHuman.clan(),
+                                                             rotatedPartner.clan()),
+               "Duel ownership and alliance must survive player-wind rotation");
+    }
+
+    expect(selectActiveMatchTopology(CoalitionTopologyId, CoalitionTopologyVersion,
+                                     &topologyError),
+           "Coalition runtime fixture must select the Coalition topology");
+    GameplayRng::seed(UINT64_C(0x15c0a1));
+    GameData::initPersons(Person(Avatar::Nucrus, Clan::Red, Wind::East));
+    expect(GameData::initMahjong(),
+           "Coalition runtime fixture must initialize Rune Game");
+
+    const Person & coalitionHuman = GameData::myPerson();
+    int coalitionLocalSeats = 0;
+    int coalitionAiSeats = 0;
+    const Person* coalitionPartner = nullptr;
+    for(const Person & player : GameData::players())
+    {
+        if(GameData::isLocallyControlled(player)) ++coalitionLocalSeats;
+        if(GameData::usesAI(player)) ++coalitionAiSeats;
+        if(player.avatar != coalitionHuman.avatar &&
+           GameData::allied(coalitionHuman, player))
+            coalitionPartner = &player;
+    }
+    expect(coalitionLocalSeats == 1 && coalitionAiSeats == 3 &&
+           coalitionPartner && GameData::usesAI(*coalitionPartner) &&
+           !GameData::isLocallyControlled(*coalitionPartner),
+           "Coalition must keep the allied seat independent and AI-controlled locally");
+
+    Persons headless;
+    headless.push_back(Person(Avatar::Nucrus, Clan::Red, Wind::East));
+    headless.push_back(Person(Avatar::Dayla, Clan::Purple, Wind::South));
+    headless.push_back(Person(Avatar::Lakkho, Clan::Yellow, Wind::West));
+    headless.push_back(Person(Avatar::Ziag, Clan::Aqua, Wind::North));
+    for(Person & player : headless) player.setAI(true);
+    expect(selectActiveMatchTopology(DuelTopologyId, DuelTopologyVersion,
+                                     &topologyError) &&
+           GameData::initPersons(headless),
+           "headless Duel fixture must accept four exact AI seats");
+    expect(std::none_of(GameData::players().begin(), GameData::players().end(),
+               [](const Person & player)
+               {
+                   return GameData::isLocallyControlled(player) ||
+                          !GameData::usesAI(player);
+               }),
+           "headless Duel must not accidentally turn one controller into a human");
+
+    expect(selectActiveMatchTopology(ClassicFreeForAllTopologyId,
+                                     ClassicFreeForAllTopologyVersion,
+                                     &topologyError),
+           "topology runtime tests must restore Classic free-for-all");
 }
 
 void configureSimulationBonuses()
@@ -4529,6 +4778,9 @@ void testTournamentContract()
                    return match.match.difficulty == AI::Difficulty::Hard &&
                           match.match.forceBehaviorProfile &&
                           match.match.behaviorProfile == AI::BehaviorProfile::Economic &&
+                          match.match.matchTopologyId == ClassicFreeForAllTopologyId &&
+                          match.match.matchTopologyVersion ==
+                              ClassicFreeForAllTopologyVersion &&
                           match.match.runeGameRulesetId == ClassicRuneGameRulesetId &&
                           match.match.runeGameRulesetVersion ==
                               ClassicRuneGameRulesetVersion;
@@ -4694,6 +4946,8 @@ void testTournamentContract()
 int runHeadlessMatchSelfTest()
 {
     configureSimulationBonuses();
+    const bool recoveryWasEnabled = Recovery::enabled();
+    const bool profileOverrideWasEnabled = AI::behaviorProfileOverrideEnabled();
 
     Persons players;
     players.push_back(Person(Avatar::Nucrus, Clan::Red, Wind::East));
@@ -4753,7 +5007,8 @@ int runHeadlessMatchSelfTest()
                   << ", error=" << second.error << '\n';
         return 1;
     }
-    if(!Recovery::enabled() || AI::behaviorProfileOverrideEnabled())
+    if(Recovery::enabled() != recoveryWasEnabled ||
+       AI::behaviorProfileOverrideEnabled() != profileOverrideWasEnabled)
     {
         std::cerr << "FAIL: headless match did not restore recovery/profile scope\n";
         return 1;
@@ -4910,6 +5165,90 @@ int runHeadlessMatchSelfTest()
        unavailable.error.find("removed-variant@3") == std::string::npos)
     {
         std::cerr << "FAIL: unavailable Rune Game ruleset was not rejected\n";
+        return 1;
+    }
+
+    Simulation::MatchConfig unavailableTopology = config;
+    unavailableTopology.matchTopologyId = "removed-topology";
+    unavailableTopology.matchTopologyVersion = 3;
+    const Simulation::MatchResult unavailableMatchTopology =
+        Simulation::runMatch(unavailableTopology);
+    if(unavailableMatchTopology.status != Simulation::MatchStatus::InvalidConfiguration ||
+       unavailableMatchTopology.error.find("removed-topology@3") == std::string::npos)
+    {
+        std::cerr << "FAIL: unavailable match topology was not rejected\n";
+        return 1;
+    }
+
+    Persons teamPlayers;
+    teamPlayers.push_back(Person(Avatar::Nucrus, Clan::Red, Wind::East));
+    teamPlayers.push_back(Person(Avatar::Dayla, Clan::Purple, Wind::South));
+    teamPlayers.push_back(Person(Avatar::Lakkho, Clan::Yellow, Wind::West));
+    teamPlayers.push_back(Person(Avatar::Ziag, Clan::Aqua, Wind::North));
+    for(Person & player : teamPlayers) player.setAI(true);
+
+    const auto validateTeamMatch = [&](const char* topologyId, int topologyVersion,
+                                       std::uint64_t seed) -> bool
+    {
+        Simulation::MatchConfig teamConfig = config;
+        teamConfig.seed = seed;
+        teamConfig.persons = teamPlayers;
+        teamConfig.matchTopologyId = topologyId;
+        teamConfig.matchTopologyVersion = topologyVersion;
+        teamConfig.captureFullReplay = false;
+
+        const Simulation::MatchResult result = Simulation::runMatch(teamConfig);
+        if(!result.completed() || result.matchTopologyId != topologyId ||
+           result.matchTopologyVersion != topologyVersion || result.score.size() != 4)
+        {
+            std::cerr << "FAIL: " << topologyId << " headless match status="
+                      << Simulation::statusName(result.status)
+                      << ", ticks=" << result.ticks << ", error=" << result.error << '\n';
+            return false;
+        }
+
+        const auto sameTeam = [](const MatchScore::PlayerResult & lhs,
+                                 const MatchScore::PlayerResult & rhs)
+        {
+            return lhs.teamId == rhs.teamId && lhs.teamScore == rhs.teamScore &&
+                   lhs.teamRank == rhs.teamRank && lhs.finalRank == rhs.finalRank;
+        };
+        if(!sameTeam(result.score[0], result.score[1]) ||
+           !sameTeam(result.score[2], result.score[3]) ||
+           result.score[0].teamId == result.score[2].teamId)
+        {
+            std::cerr << "FAIL: " << topologyId
+                      << " headless match did not preserve team scoring\n";
+            return false;
+        }
+
+        const int winningTeam = std::min_element(result.score.begin(), result.score.end(),
+            [](const MatchScore::PlayerResult & lhs, const MatchScore::PlayerResult & rhs)
+            {
+                return lhs.finalRank < rhs.finalRank;
+            })->teamId;
+        const std::size_t winners = std::count_if(result.score.begin(), result.score.end(),
+            [winningTeam](const MatchScore::PlayerResult & player)
+            {
+                return player.finalRank == 1 && player.teamId == winningTeam;
+            });
+        if(winners != 2)
+        {
+            std::cerr << "FAIL: " << topologyId
+                      << " headless match did not produce a two-seat winning team\n";
+            return false;
+        }
+
+        return true;
+    };
+
+    if(!validateTeamMatch(DuelTopologyId, DuelTopologyVersion,
+                          UINT64_C(0x15a5d001)) ||
+       !validateTeamMatch(CoalitionTopologyId, CoalitionTopologyVersion,
+                          UINT64_C(0x15a5c001)) ||
+       activeMatchTopology().id() != ClassicFreeForAllTopologyId)
+    {
+        std::cerr << "FAIL: team topology simulation scope was not restored\n";
         return 1;
     }
 
@@ -5552,6 +5891,7 @@ int main(int argc, char** argv)
     testExposedKongDispatchAndReplacementDraw();
     testSpellAndSpecialityContracts();
     testSpellCastingAI();
+    testCoalitionPlayerSpellTargets();
     testMahjongCastDeadTargetMessage();
     testAdventureProfiles();
     testAdventureCoordination();
@@ -5567,6 +5907,7 @@ int main(int argc, char** argv)
     testActionReplay();
     testGameSummaryInputGuard();
     testMatchScoreContract();
+    testMatchTopologyRuntimeContract();
     testTournamentContract();
 
     expect(Speciality(Speciality::CastSilence).toSpell()() == Spell::Silence,

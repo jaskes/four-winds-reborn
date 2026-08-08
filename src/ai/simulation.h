@@ -11,6 +11,7 @@
 #include "aiprofile.h"
 #include "gamedata.h"
 #include "matchscore.h"
+#include "matchtopology.h"
 #include "runegameruleset.h"
 
 namespace Simulation
@@ -43,6 +44,8 @@ namespace Simulation
         AI::BehaviorProfile behaviorProfile = AI::BehaviorProfile::Balanced;
         std::string runeGameRulesetId = ClassicRuneGameRulesetId;
         int runeGameRulesetVersion = ClassicRuneGameRulesetVersion;
+        std::string matchTopologyId = ClassicFreeForAllTopologyId;
+        int matchTopologyVersion = ClassicFreeForAllTopologyVersion;
         Persons persons;
         std::size_t maximumTicks = 100000;
         std::size_t maximumUnchangedTicks = 4;
@@ -95,6 +98,8 @@ namespace Simulation
         std::uint64_t seed = 0;
         std::string runeGameRulesetId = ClassicRuneGameRulesetId;
         int runeGameRulesetVersion = ClassicRuneGameRulesetVersion;
+        std::string matchTopologyId = ClassicFreeForAllTopologyId;
+        int matchTopologyVersion = ClassicFreeForAllTopologyVersion;
         std::uint64_t rngDraws = 0;
         std::size_t ticks = 0;
         std::size_t unchangedTicks = 0;

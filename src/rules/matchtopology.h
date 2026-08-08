@@ -17,10 +17,14 @@
 constexpr const char MatchTopologyIdentityKey[] = "matchTopology";
 constexpr const char ClassicFreeForAllTopologyId[] = "classic-ffa";
 constexpr int ClassicFreeForAllTopologyVersion = 1;
+constexpr const char DuelTopologyId[] = "duel";
+constexpr int DuelTopologyVersion = 1;
+constexpr const char CoalitionTopologyId[] = "coalition";
+constexpr int CoalitionTopologyVersion = 1;
 
 // Match topology owns player/control relationships, independently of the
-// Rune Game ruleset. A topology may keep four winds while grouping them under
-// fewer controllers (Duel) or competitive teams (Coalition).
+// Rune Game ruleset. Runtime ownership is keyed by clan because player winds
+// rotate between Rune Game rounds while clans remain stable for the match.
 class MatchTopology
 {
 public:
@@ -36,9 +40,13 @@ public:
     // return -1 rather than silently joining a controller or team.
     virtual int controllerForWind(int windId) const = 0;
     virtual int teamForWind(int windId) const = 0;
+    virtual int controllerForClan(int clanId) const = 0;
+    virtual int teamForClan(int clanId) const = 0;
 
     bool sharesController(int firstWindId, int secondWindId) const;
     bool allied(int firstWindId, int secondWindId) const;
+    bool sharesControllerByClan(int firstClanId, int secondClanId) const;
+    bool alliedByClan(int firstClanId, int secondClanId) const;
 };
 
 struct MatchTopologyIdentity
@@ -50,6 +58,8 @@ struct MatchTopologyIdentity
 };
 
 const MatchTopology & classicFreeForAllTopology(void);
+const MatchTopology & duelTopology(void);
+const MatchTopology & coalitionTopology(void);
 const MatchTopology & activeMatchTopology(void);
 const MatchTopology* findMatchTopology(const std::string & id, int version);
 

@@ -221,13 +221,13 @@ bool GameData::canClaimLand(const RemotePlayer & player, const Land & land)
 
     const LandInfo & target = landInfo(land);
     const Clan previousOwner = target.clan;
-    if(!previousOwner.isValid() || previousOwner == player.clan) return false;
+    if(!previousOwner.isValid() || GameData::allied(previousOwner, player.clan)) return false;
     if(player.landClaimPoints(previousOwner) < target.stat.point) return false;
 
     const bool sharesBorder = std::any_of(target.borders.begin(), target.borders.end(),
         [&](const Land & border)
     {
-        return !border.isTowerWinds() && landInfo(border).clan == player.clan;
+        return !border.isTowerWinds() && GameData::allied(landInfo(border).clan, player.clan);
     });
     if(!sharesBorder) return false;
 

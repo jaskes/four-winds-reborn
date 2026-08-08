@@ -33,6 +33,7 @@
 #include "battlesession.h"
 #include "crashreport.h"
 #include "gamedata.h"
+#include "matchtopology.h"
 #include "replay.h"
 #include "runegameruleset.h"
 
@@ -365,7 +366,7 @@ namespace GameData
         {
             // Developer autoplay still represents the human seat. Only actual AI
             // opponents receive the deliberately asymmetric Unfair economy.
-            if(!player.isAI()) continue;
+            if(!usesAI(player)) continue;
 
             player.points += spellPoints;
             if(!initial && rules.mahjongPartAiLandClaimBonus > 0)
@@ -373,7 +374,7 @@ namespace GameData
                 for(const auto clanId : clans_all)
                 {
                     const Clan clan(clanId);
-                    if(clan != player.clan)
+                    if(!allied(clan, player.clan))
                         player.addLandClaimPoints(clan, rules.mahjongPartAiLandClaimBonus);
                 }
             }
@@ -450,6 +451,55 @@ const LocalPlayers & GameData::players(void)
     return gamers;
 }
 
+Avatar GameData::localMahjongAvatar(void)
+{
+    const LocalPlayer & current = playerOfWind(currentWind);
+
+    // During an owned turn the controller must see and act with that hand,
+    // regardless of which of its two Duel seats was selected initially.
+    if(!dropStone.isValid() && isLocallyControlled(current) && !usesAI(current))
+        return current.avatar;
+
+    // Once a rune has been discarded, select the controller-owned opponent
+    // that can answer it.  There is only one such opponent in Duel, but the
+    // ordered scan also makes this deterministic for future topologies.
+    if(dropStone.isValid())
+    {
+        const RuneGameRuleset & ruleset = activeRuneGameRuleset();
+        const auto claimPriority = [&](const LocalPlayer & player) {
+            WinResults result;
+            if(player.isWinMahjong(currentWind, roundWind, dropStone, &result, ruleset)) return 4;
+            if(player.isMahjongKong1(currentWind, dropStone, ruleset)) return 3;
+            if(player.isMahjongPung(currentWind, dropStone, ruleset)) return 2;
+            if(player.isMahjongChao(currentWind, dropStone, ruleset)) return 1;
+            return 0;
+        };
+
+        const LocalPlayer* selected = nullptr;
+        int selectedPriority = -1;
+        for(const LocalPlayer & player : gamers)
+        {
+            if(player.wind == currentWind || !isLocallyControlled(player) || usesAI(player))
+                continue;
+            const int priority = claimPriority(player);
+            if(selectedPriority < priority)
+            {
+                selected = &player;
+                selectedPriority = priority;
+            }
+        }
+        if(selected) return selected->avatar;
+    }
+
+    return person.avatar;
+}
+
+Avatar GameData::localAdventureAvatar(void)
+{
+    const LocalPlayer & current = playerOfWind(currentWind);
+    return isLocallyControlled(current) && !usesAI(current) ? current.avatar : person.avatar;
+}
+
 AI::Difficulty GameData::aiDifficulty(void)
 {
     return difficulty;
@@ -462,12 +512,52 @@ void GameData::setAIDifficulty(AI::Difficulty value)
 
 bool GameData::usesAI(const Person & player)
 {
+    if(isLocallyControlled(player))
+    {
+#ifdef BUILD_DEBUG
+        return developerAutoplayAvatar.isValid() && player.avatar == developerAutoplayAvatar;
+#else
+        return false;
+#endif
+    }
 #ifdef BUILD_DEBUG
     return player.isAI() || (developerAutoplayAvatar.isValid() &&
                              player.avatar == developerAutoplayAvatar);
 #else
     return player.isAI();
 #endif
+}
+
+int GameData::localControllerId(void)
+{
+    // Headless/simulation games intentionally store an AI seat as the local
+    // reference person.  It must not turn that controller (and, in Duel, its
+    // partner hand) into a human-controlled seat.
+    return !person.isAI() && person.clan.isValid() ?
+        activeMatchTopology().controllerForClan(person.clan()) : -1;
+}
+
+bool GameData::isLocallyControlled(const Person & player)
+{
+    const int local = localControllerId();
+    return 0 <= local && player.clan.isValid() &&
+           activeMatchTopology().controllerForClan(player.clan()) == local;
+}
+
+bool GameData::allied(const Person & first, const Person & second)
+{
+    return first.clan.isValid() && second.clan.isValid() &&
+           activeMatchTopology().alliedByClan(first.clan(), second.clan());
+}
+
+bool GameData::allied(const Clan & first, const Clan & second)
+{
+    if(!first.isValid() || !second.isValid()) return false;
+    if(first == second) return true;
+
+    const LocalPlayer* firstPlayer = gamers.playerOfClan(first);
+    const LocalPlayer* secondPlayer = gamers.playerOfClan(second);
+    return firstPlayer && secondPlayer && allied(*firstPlayer, *secondPlayer);
 }
 
 bool GameData::developerAssisted(void)
@@ -681,9 +771,9 @@ void GameData::initPersons(const Person & cur)
     Replay::clearActionJournal();
     Persons persons(cur);
     gamers.setPersons(persons);
+    const LocalPlayer* selected = gamers.playerOfAvatar(cur.avatar);
+    person = selected ? static_cast<const Person &>(*selected) : cur;
     grantAiDifficultyIncome(true);
-
-    person = cur;
     roundWind = Wind(Wind::None);
     partWind = Wind(Wind::None);
     currentWind = Wind(Wind::None);
@@ -723,8 +813,8 @@ bool GameData::initPersons(const Persons & configured)
 
     Replay::clearActionJournal();
     gamers.setPersons(persons);
-    grantAiDifficultyIncome(true);
     person = persons.front();
+    grantAiDifficultyIncome(true);
     roundWind = Wind(Wind::None);
     partWind = Wind(Wind::None);
     currentWind = Wind(Wind::None);

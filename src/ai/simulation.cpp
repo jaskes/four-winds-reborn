@@ -84,6 +84,24 @@ public:
     }
 };
 
+class MatchTopologyScope
+{
+    MatchTopologyIdentity previous;
+
+public:
+    explicit MatchTopologyScope(const Simulation::MatchConfig & config) :
+        previous(matchTopologyIdentity(activeMatchTopology()))
+    {
+        selectActiveMatchTopology(config.matchTopologyId,
+                                  config.matchTopologyVersion);
+    }
+
+    ~MatchTopologyScope()
+    {
+        selectActiveMatchTopology(previous.id, previous.version);
+    }
+};
+
 struct ObservedUnit
 {
     Avatar avatar;
@@ -268,6 +286,14 @@ bool validConfiguration(const Simulation::MatchConfig & config, std::string* err
             std::to_string(config.runeGameRulesetVersion);
         return false;
     }
+    if(!findMatchTopology(config.matchTopologyId,
+                          config.matchTopologyVersion))
+    {
+        if(error) *error = "Match topology is unavailable or incompatible: " +
+            config.matchTopologyId + "@" +
+            std::to_string(config.matchTopologyVersion);
+        return false;
+    }
     if(config.persons.size() != winds_all.size())
     {
         if(error) *error = "a match requires exactly four players";
@@ -363,6 +389,8 @@ Simulation::MatchResult Simulation::runMatch(const MatchConfig & config)
     result.seed = config.seed;
     result.runeGameRulesetId = config.runeGameRulesetId;
     result.runeGameRulesetVersion = config.runeGameRulesetVersion;
+    result.matchTopologyId = config.matchTopologyId;
+    result.matchTopologyVersion = config.matchTopologyVersion;
 
     if(!validConfiguration(config, &result.error)) return result;
 
@@ -372,6 +400,7 @@ Simulation::MatchResult Simulation::runMatch(const MatchConfig & config)
         ReplayCaptureScope captureReplay(config.captureFullReplay);
         BehaviorProfileScope selectBehaviorProfile(config);
         RuneGameRulesetScope selectRuleset(config);
+        MatchTopologyScope selectTopology(config);
         result.fullReplayCaptured = config.captureFullReplay;
         GameplayRng::seed(config.seed);
         GameData::setAIDifficulty(config.difficulty);

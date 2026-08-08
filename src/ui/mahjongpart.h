@@ -68,7 +68,7 @@ struct TurnAnimation : SpritesAnimation
 
 class MahjongPartScreen : public JsonWindow
 {
-    const Avatar	myAvatar;
+    Avatar		myAvatar;
     LocalData		ld;
     UnicodeList		gameLogs;
 
@@ -140,6 +140,8 @@ class MahjongPartScreen : public JsonWindow
     TickTrigger		tt;
 
     void		actionButtonLocalReady(void);
+    bool                selectLocalAvatar(void);
+    void                refreshDiscardClaimButtons(void);
     bool                submitHumanAction(const ClientMessage &);
     void                showActionRejection(const ActionRejection &);
     void                retireTurnTimeout(void);

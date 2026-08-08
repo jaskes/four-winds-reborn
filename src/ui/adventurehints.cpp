@@ -36,13 +36,14 @@ bool AdventureHints::canClaimObserved(const LocalData & data, const Land & land)
 
     const LandInfo & target = GameData::landInfo(land);
     const Clan previousOwner = target.clan;
-    if(!previousOwner.isValid() || previousOwner == player.clan) return false;
+    if(!previousOwner.isValid() || GameData::allied(previousOwner, player.clan)) return false;
     if(player.landClaimPoints(previousOwner) < target.stat.point) return false;
 
     const bool sharesBorder = std::any_of(target.borders.begin(), target.borders.end(),
         [&](const Land & border)
     {
-        return !border.isTowerWinds() && GameData::landInfo(border).clan == player.clan;
+        return !border.isTowerWinds() &&
+               GameData::allied(GameData::landInfo(border).clan, player.clan);
     });
     if(!sharesBorder) return false;
 
@@ -59,7 +60,7 @@ AdventureHints::DestinationCue AdventureHints::destinationCue(const LocalData & 
     if(planned.moveSelectedCreatures(origin, target).empty()) return DestinationCue::None;
 
     const Clan owner = GameData::landInfo(target).clan;
-    return target.isTowerWinds() || owner == data.myPlayer().clan ?
+    return target.isTowerWinds() || GameData::allied(owner, data.myPlayer().clan) ?
         DestinationCue::Move : DestinationCue::Attack;
 }
 
@@ -74,7 +75,7 @@ AdventureHints::BattlePreview AdventureHints::battlePreview(const LocalData & da
 
     const LocalPlayer & player = data.myPlayer();
     const Clan owner = GameData::landInfo(target).clan;
-    if(!owner.isValid() || owner == player.clan) return preview;
+    if(!owner.isValid() || GameData::allied(owner, player.clan)) return preview;
 
     BattleParty attackers = selectedAttackers(player, origin);
     if(attackers.isEmpty()) return preview;

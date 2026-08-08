@@ -38,6 +38,7 @@
 #include "replay.h"
 #include "replayfiles.h"
 #include "runegameruleset.h"
+#include "matchtopology.h"
 #include "savegames.h"
 #include "selectperson.h"
 #include "showplayers.h"
@@ -503,6 +504,13 @@ bool RuneWarsClient::exec(void)
 		// completes, the selected value lives in the save and is not changed
 		// by later edits to settings.json.
 		GameData::setAIDifficulty(Settings::aiDifficulty());
+		if(Settings::matchMode() == "duel")
+		    selectActiveMatchTopology(DuelTopologyId, DuelTopologyVersion);
+		else if(Settings::matchMode() == "coalition")
+		    selectActiveMatchTopology(CoalitionTopologyId, CoalitionTopologyVersion);
+		else
+		    selectActiveMatchTopology(ClassicFreeForAllTopologyId,
+		                              ClassicFreeForAllTopologyVersion);
 		if(Settings::runeGameRuleset() == QuickRuneGameRulesetId)
 		    selectActiveRuneGameRuleset(QuickRuneGameRulesetId,
 		                                QuickRuneGameRulesetVersion);

@@ -52,6 +52,8 @@ namespace Settings
     void                setAIDifficulty(AI::Difficulty);
     std::string         runeGameRuleset(void);
     void                setRuneGameRuleset(const std::string &);
+    std::string         matchMode(void);
+    void                setMatchMode(const std::string &);
     int                 presentationDelay(int);
 
     bool		read(void);

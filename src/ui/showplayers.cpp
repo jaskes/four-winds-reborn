@@ -111,7 +111,8 @@ Size ShowPlayersScreen::renderPerson(const Person & user, bool selected, const P
     const FontRender & frs = GameTheme::fontRender(font);
 
     renderText(frs, avatarInfo.name, color, Point(posx1, center.y + 10), AlignRight);
-    renderText(frs, (user.isAI() ? "AI" : "Human"), color, Point(posx1, center.y + 70), AlignRight);
+    renderText(frs, (GameData::usesAI(user) ? "AI" : "Human"), color,
+               Point(posx1, center.y + 70), AlignRight);
     renderText(frs, clanInfo.name, color, Point(posx2, center.y + 10));
     renderText(frs, windInfo.name, color, Point(posx2, center.y + 70));
 
@@ -127,7 +128,7 @@ void ShowPlayersScreen::renderWindow(void)
 
     for(auto & user : persons)
     {
-	auto sz = renderPerson(user, user.avatar == selectedPerson.avatar, center);
+	auto sz = renderPerson(user, GameData::isLocallyControlled(user), center);
 	center.y += sz.h + 20;
     }
 }

@@ -861,6 +861,12 @@ void MoveFlagWindow::setVisible(bool f)
     Window::setVisible(f);
 }
 
+void MoveFlagWindow::setClan(const Clan & clan)
+{
+    flagTexture = GameTheme::texture(GameData::clanInfo(clan).flag1);
+    setSize(flagTexture.size());
+}
+
 /* AdventurePartScreen */
 AdventurePartScreen::AdventurePartScreen(const Avatar & ava) : MapScreenBase(GameData::toLocalData(ava), nullptr), myAvatar(ava), allowTickEvent(true),
     moveFlag(ld.myPlayer().clan, *this), buttonOrder(nullptr), buttonDone(nullptr), buttonUndo(nullptr), buttonDismiss(nullptr)
@@ -945,6 +951,7 @@ void AdventurePartScreen::tickEvent(u32 ms)
 {
     if(allowTickEvent && tt.check(ms, 100))
     {
+        if(actions.empty()) selectLocalAvatar();
         GameData::adventure2Client(myAvatar, actions);
         bool redraw = false;
         bool processedAction = false;
@@ -1002,6 +1009,20 @@ void AdventurePartScreen::tickEvent(u32 ms)
 
         if(redraw) renderWindow();
     }
+}
+
+bool AdventurePartScreen::selectLocalAvatar(void)
+{
+    const Avatar selected = GameData::localAdventureAvatar();
+    if(!selected.isValid() || selected == myAvatar) return false;
+
+    cancelOrderMode(false);
+    myAvatar = selected;
+    ld = GameData::toLocalData(myAvatar);
+    moveFlag.setClan(ld.myPlayer().clan);
+    ld.myPlayer().army.setAllSelected();
+    updateCommandButtons();
+    return true;
 }
 
 bool AdventurePartScreen::actionAdventureTurn(const ActionMessage & v)

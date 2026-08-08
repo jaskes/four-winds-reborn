@@ -174,8 +174,10 @@ bool ShowCastSpellDialog::userEvent(int act, void* data)
         if(act == CreatureIconClickLeft)
         {
             if(info.target() != SpellTarget::Land && selectedCreature.canReceiveSpell(spell) &&
-               (((info.target() & SpellTarget::Friendly) && player.clan == selectedCreature.clan()) ||
-                ((info.target() & SpellTarget::Enemy) && player.clan != selectedCreature.clan())))
+               (((info.target() & SpellTarget::Friendly) &&
+                 GameData::allied(player.clan, selectedCreature.clan())) ||
+                ((info.target() & SpellTarget::Enemy) &&
+                 !GameData::allied(player.clan, selectedCreature.clan()))))
             {
                 if(spell() == Spell::Teleport)
                 {

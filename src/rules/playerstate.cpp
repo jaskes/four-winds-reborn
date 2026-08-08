@@ -25,6 +25,7 @@
 
 #include "gameplayrng.h"
 #include "gamedata.h"
+#include "matchtopology.h"
 #include "runegameruleset.h"
 
 namespace GameData
@@ -113,7 +114,28 @@ Persons::Persons(const Person & person)
 	for(auto & pers : *this)
 	    pers.setAI(true);
 
-	GameplayRng::shuffle(begin(), end());
+	if(activeMatchTopology().id() == ClassicFreeForAllTopologyId)
+	    GameplayRng::shuffle(begin(), end());
+	else
+	{
+	    // Duel and Coalition use two readable island halves. Red/Purple are
+	    // assigned to East/South and Yellow/Aqua to West/North; order within
+	    // each pair remains random so winds do not become a clan alias.
+	    std::vector<Person> westHalf;
+	    std::vector<Person> eastHalf;
+	    for(const Person & pers : *this)
+	    {
+		if(pers.clan == Clan(Clan::Red) || pers.clan == Clan(Clan::Purple))
+		    westHalf.push_back(pers);
+		else
+		    eastHalf.push_back(pers);
+	    }
+	    GameplayRng::shuffle(westHalf.begin(), westHalf.end());
+	    GameplayRng::shuffle(eastHalf.begin(), eastHalf.end());
+	    clear();
+	    insert(end(), westHalf.begin(), westHalf.end());
+	    insert(end(), eastHalf.begin(), eastHalf.end());
+	}
 
 	at(0).wind = Wind(Wind::East);
 	at(1).wind = Wind(Wind::South);
@@ -783,13 +805,31 @@ LocalPlayer* LocalPlayers::playerOfClan(const Clan & clan)
     return it != end() ? & (*it) : nullptr;
 }
 
+const LocalPlayer* LocalPlayers::playerOfClan(const Clan & clan) const
+{
+    auto it = std::find_if(begin(), end(), [&](const LocalPlayer & lp){ return lp.isClan(clan); });
+    return it != end() ? & (*it) : nullptr;
+}
+
 LocalPlayer* LocalPlayers::playerOfWind(const Wind & wind)
 {
     auto it = std::find_if(begin(), end(), [&](const LocalPlayer & lp){ return lp.isWind(wind); });
     return it != end() ? & (*it) : nullptr;
 }
 
+const LocalPlayer* LocalPlayers::playerOfWind(const Wind & wind) const
+{
+    auto it = std::find_if(begin(), end(), [&](const LocalPlayer & lp){ return lp.isWind(wind); });
+    return it != end() ? & (*it) : nullptr;
+}
+
 LocalPlayer* LocalPlayers::playerOfAvatar(const Avatar & ava)
+{
+    auto it = std::find_if(begin(), end(), [&](const LocalPlayer & lp){ return lp.isAvatar(ava); });
+    return it != end() ? & (*it) : nullptr;
+}
+
+const LocalPlayer* LocalPlayers::playerOfAvatar(const Avatar & ava) const
 {
     auto it = std::find_if(begin(), end(), [&](const LocalPlayer & lp){ return lp.isAvatar(ava); });
     return it != end() ? & (*it) : nullptr;

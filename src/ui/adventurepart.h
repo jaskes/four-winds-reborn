@@ -203,6 +203,7 @@ public:
     bool                isAreaPoint(const Point &) const override { return false; }
 
     void		setVisible(bool);
+    void                setClan(const Clan &);
     void		setLand(const Land & ln) { land = ln; }
     const Land &	fromLand(void) const { return land; }
 };
@@ -222,7 +223,7 @@ public:
 
 class AdventurePartScreen : public MapScreenBase
 {
-    const Avatar	myAvatar;
+    Avatar		myAvatar;
     bool		allowTickEvent;
     int			delayCombatResult;
 
@@ -252,6 +253,7 @@ class AdventurePartScreen : public MapScreenBase
     void		renderLabel(void) override;
     bool		isAdventureMode(void) const override { return true; }
     bool                submitHumanAction(const ClientMessage &);
+    bool                selectLocalAvatar(void);
     void                showActionRejection(const ActionRejection &);
     void		updateCommandButtons(void);
     bool                commitPendingOrders(void);

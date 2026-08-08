@@ -152,7 +152,9 @@ bool AdventurePartScreen::moveSelectedParty(const Land & fromLand, const Land & 
     playSound("snddrop");
 
     const LandInfo & landInfo = GameData::landInfo(toLand);
-    if(player.clan != landInfo.clan)
+    const RemotePlayer* defender = landInfo.clan.isValid() ?
+        GameData::players().playerOfClan(landInfo.clan) : nullptr;
+    if(defender && !GameData::allied(player, *defender))
 	DisplayScene::pushEvent(nullptr, LandPolygonCombatStatus, const_cast<LandInfo*>(& landInfo));
 
     DisplayScene::pushEvent(nullptr, LandPolygonFlagAnimationReInit, nullptr);

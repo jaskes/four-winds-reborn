@@ -37,7 +37,7 @@ namespace
         const std::vector<Land> & borders = GameData::landInfo(land).borders;
         for(const LocalPlayer & visible : observation.state().players)
         {
-            if(visible.clan == observation.player().clan) continue;
+            if(GameData::allied(visible.clan, observation.player().clan)) continue;
             for(const Land & border : borders)
             {
                 const BattleParty* party = visible.army.findPartyConst(border);
@@ -112,7 +112,8 @@ namespace
             GameData::landInfo(land).borders.begin(), GameData::landInfo(land).borders.end(),
             [&](const Land & border)
             {
-                return !border.isTowerWinds() && GameData::landInfo(border).clan == clan;
+                return !border.isTowerWinds() &&
+                       GameData::allied(GameData::landInfo(border).clan, clan);
             }));
     }
 
@@ -124,7 +125,7 @@ namespace
             {
                 if(border.isTowerWinds()) return false;
                 const Clan owner = GameData::landInfo(border).clan;
-                return owner.isValid() && owner != clan;
+                return owner.isValid() && !GameData::allied(owner, clan);
             }));
     }
 
@@ -147,7 +148,7 @@ namespace
             if(land.isTowerWinds()) continue;
 
             const LandInfo & info = GameData::landInfo(land);
-            if(!info.clan.isValid() || info.clan == player.clan) continue;
+            if(!info.clan.isValid() || GameData::allied(info.clan, player.clan)) continue;
 
             const Lands path = Lands::pathfind(origin, land);
             if(path.empty()) continue;

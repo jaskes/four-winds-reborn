@@ -40,6 +40,7 @@ namespace
     std::string speed = "classic";
     std::string selectedContentTheme = "classic";
     std::string selectedRuneGameRuleset = "classic";
+    std::string selectedMatchMode = "classic";
     AI::Difficulty defaultAiDifficulty = AI::Difficulty::Normal;
 
     int normalizedVolume(int value)
@@ -75,6 +76,14 @@ namespace
         return String::toLower(value) == "quick" ? "quick" : "classic";
     }
 
+    std::string normalizedMatchMode(const std::string & value)
+    {
+        const std::string lower = String::toLower(value);
+        if(lower == "duel") return "duel";
+        if(lower == "coalition") return "coalition";
+        return "classic";
+    }
+
     std::string normalizedContentTheme(const std::string & value,
                                        const std::string & fallback = "classic")
     {
@@ -107,6 +116,7 @@ bool Settings::read(void)
     speed = "classic";
     defaultAiDifficulty = AI::Difficulty::Normal;
     selectedRuneGameRuleset = "classic";
+    selectedMatchMode = "classic";
     selectedContentTheme = "classic";
 
     JsonObject jo = GameTheme::jsonResource("config.json").toObject();
@@ -129,6 +139,8 @@ bool Settings::read(void)
 	    jo.getString("ai:difficulty", AI::difficultyName(defaultAiDifficulty)));
 	selectedRuneGameRuleset = normalizedRuneGameRuleset(
 	    jo.getString("rune_game:ruleset", selectedRuneGameRuleset));
+	selectedMatchMode = normalizedMatchMode(
+	    jo.getString("match:mode", selectedMatchMode));
     }
 
     JsonObject user = JsonContentFile(userSettingsFile()).toObject();
@@ -153,6 +165,8 @@ bool Settings::read(void)
 	    user.getString("ai:difficulty", AI::difficultyName(defaultAiDifficulty)));
 	selectedRuneGameRuleset = normalizedRuneGameRuleset(
 	    user.getString("rune_game:ruleset", selectedRuneGameRuleset));
+	selectedMatchMode = normalizedMatchMode(
+	    user.getString("match:mode", selectedMatchMode));
 	selectedContentTheme = normalizedContentTheme(
 	    user.getString("content:theme", selectedContentTheme));
     }
@@ -183,6 +197,7 @@ bool Settings::write(std::string* error)
     jo.addString("game:speed", speed);
     jo.addString("ai:difficulty", AI::difficultyName(defaultAiDifficulty));
     jo.addString("rune_game:ruleset", selectedRuneGameRuleset);
+    jo.addString("match:mode", selectedMatchMode);
     jo.addString("content:theme", selectedContentTheme);
 
     if(!Systems::saveString2File(jo.toString(), file))
@@ -251,6 +266,16 @@ std::string Settings::runeGameRuleset(void)
 void Settings::setRuneGameRuleset(const std::string & value)
 {
     selectedRuneGameRuleset = normalizedRuneGameRuleset(value);
+}
+
+std::string Settings::matchMode(void)
+{
+    return selectedMatchMode;
+}
+
+void Settings::setMatchMode(const std::string & value)
+{
+    selectedMatchMode = normalizedMatchMode(value);
 }
 
 int Settings::presentationDelay(int milliseconds)

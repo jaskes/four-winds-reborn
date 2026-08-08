@@ -16,6 +16,7 @@ class SettingsMenuScreen : public JsonWindow
     {
         AIDifficulty,
         RuneGameRules,
+        MatchMode,
         Language,
         ContentPackage,
         GameSpeed,
@@ -44,6 +45,7 @@ class SettingsMenuScreen : public JsonWindow
     std::string        gameSpeed;
     AI::Difficulty     aiDifficulty;
     std::string        runeGameRuleset;
+    std::string        matchMode;
     int                musicVolume;
     int                effectsVolume;
     int                voiceVolume;
