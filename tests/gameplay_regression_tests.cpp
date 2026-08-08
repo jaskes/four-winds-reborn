@@ -26,6 +26,7 @@
 #include "gametheme.h"
 #include "gamesummarypart.h"
 #include "intropart.h"
+#include "matchtopology.h"
 #include "recovery.h"
 #include "replay.h"
 #include "replayfiles.h"
@@ -266,6 +267,68 @@ void testRuneGameRulesetIdentityContract()
            sameRuneGameRuleset(runeGameRulesetIdentity(activeRuneGameRuleset()),
                                classicIdentity),
            "unregistered rulesets must be rejected without changing the active ruleset");
+}
+
+void testMatchTopologyIdentityContract()
+{
+    std::string topologyError;
+    expect(selectActiveMatchTopology(ClassicFreeForAllTopologyId,
+                                     ClassicFreeForAllTopologyVersion,
+                                     &topologyError) && topologyError.empty(),
+           "the registered Classic free-for-all topology must be selectable");
+
+    const MatchTopology & classic = activeMatchTopology();
+    const MatchTopologyIdentity classicIdentity = matchTopologyIdentity(classic);
+    const JsonObject encodedClassic = matchTopologyIdentityJson(classic);
+    expect(classicIdentity.id == ClassicFreeForAllTopologyId &&
+           classicIdentity.version == ClassicFreeForAllTopologyVersion &&
+           encodedClassic.getString("id") == ClassicFreeForAllTopologyId &&
+           encodedClassic.getInteger("version") == ClassicFreeForAllTopologyVersion &&
+           classic.seatCount() == 4 && classic.controllerCount() == 4 &&
+           classic.teamCount() == 4 &&
+           classic.controllerForWind(Wind::East) == 0 &&
+           classic.controllerForWind(Wind::North) == 3 &&
+           classic.teamForWind(Wind::East) == 0 &&
+           classic.teamForWind(Wind::North) == 3,
+           "Classic topology identity and four independent seats must remain stable");
+    expect(classic.sharesController(Wind::East, Wind::East) &&
+           !classic.sharesController(Wind::East, Wind::South) &&
+           classic.allied(Wind::West, Wind::West) &&
+           !classic.allied(Wind::West, Wind::North) &&
+           classic.controllerForWind(Wind::None) == -1 &&
+           classic.teamForWind(99) == -1 &&
+           !classic.allied(Wind::None, Wind::None),
+           "Classic topology must not silently group distinct or invalid winds");
+
+    MatchTopologyIdentity resolved;
+    const JsonObject legacyContainer;
+    topologyError.clear();
+    expect(resolveMatchTopologyIdentity(legacyContainer, resolved, true, &topologyError) &&
+           sameMatchTopology(resolved, classicIdentity) && topologyError.empty(),
+           "legacy artifacts without topology metadata must load as Classic free-for-all");
+    topologyError.clear();
+    expect(!resolveMatchTopologyIdentity(legacyContainer, resolved, false, &topologyError) &&
+           topologyError == "Match topology metadata is missing",
+           "new artifacts must be able to require explicit topology metadata");
+
+    JsonObject malformed;
+    malformed.addString(MatchTopologyIdentityKey, "classic-ffa");
+    topologyError.clear();
+    expect(!resolveMatchTopologyIdentity(malformed, resolved, true, &topologyError) &&
+           topologyError == "Match topology metadata is invalid",
+           "malformed topology metadata must be rejected");
+
+    JsonObject unavailableIdentity;
+    unavailableIdentity.addString("id", "duel");
+    unavailableIdentity.addInteger("version", 7);
+    JsonObject unavailable;
+    unavailable.addObject(MatchTopologyIdentityKey, unavailableIdentity);
+    topologyError.clear();
+    expect(!resolveMatchTopologyIdentity(unavailable, resolved, true, &topologyError) &&
+           topologyError.find("duel@7") != std::string::npos &&
+           !selectActiveMatchTopology("duel", 7, nullptr) &&
+           sameMatchTopology(matchTopologyIdentity(activeMatchTopology()), classicIdentity),
+           "unregistered topologies must be rejected without changing the active topology");
 }
 
 void testContentPackageIdentityContract()
@@ -1168,12 +1231,15 @@ void testActionReplay()
            journalInfo.gamePart == Menu::MahjongPart &&
            journalInfo.rulesetId == ClassicRuneGameRulesetId &&
            journalInfo.rulesetVersion == ClassicRuneGameRulesetVersion &&
+           journalInfo.topologyId == ClassicFreeForAllTopologyId &&
+           journalInfo.topologyVersion == ClassicFreeForAllTopologyVersion &&
            journalInfo.contentPackageId == ClassicContentPackageId &&
            journalInfo.contentPackageVersion == ClassicContentPackageVersion &&
            journalInfo.contiguousToCheckpoint &&
            GameData::authoritativeState().toString() == stateBeforeJournalInspection,
            "replay inspection must expose library metadata without mutating game state");
     const JsonObject* journalRuleset = journal.getObject(RuneGameRulesetIdentityKey);
+    const JsonObject* journalTopology = journal.getObject(MatchTopologyIdentityKey);
     const JsonObject* journalPackage = journal.getObject(ContentPackageIdentityKey);
     expect(journal.getInteger("schema") == 3 &&
            journal.getString("aiBehaviorProfile") == "aggressive" &&
@@ -1181,6 +1247,8 @@ void testActionReplay()
            journal.getBoolean("contiguousToCheckpoint") &&
            journalRuleset && journalRuleset->getString("id") == ClassicRuneGameRulesetId &&
            journalRuleset->getInteger("version") == ClassicRuneGameRulesetVersion &&
+           journalTopology && journalTopology->getString("id") == ClassicFreeForAllTopologyId &&
+           journalTopology->getInteger("version") == ClassicFreeForAllTopologyVersion &&
            journalPackage && journalPackage->getString("id") == ClassicContentPackageId &&
            journalPackage->getInteger("version") == ClassicContentPackageVersion,
            "forced AI doctrine must enter a contiguous versioned replay journal");
@@ -1238,6 +1306,7 @@ void testActionReplay()
            "replay playback must expose the first deterministic mismatch as structured data");
 
     JsonObject legacyJournal = jsonObjectWithoutKey(journal, RuneGameRulesetIdentityKey);
+    legacyJournal = jsonObjectWithoutKey(legacyJournal, MatchTopologyIdentityKey);
     legacyJournal = jsonObjectWithoutKey(legacyJournal, ContentPackageIdentityKey);
     const JsonObject* journalInitial = journal.getObject("initialState");
     expect(journalInitial != nullptr,
@@ -1246,6 +1315,7 @@ void testActionReplay()
     {
         JsonObject legacyInitial =
             jsonObjectWithoutKey(*journalInitial, RuneGameRulesetIdentityKey);
+        legacyInitial = jsonObjectWithoutKey(legacyInitial, MatchTopologyIdentityKey);
         legacyInitial = jsonObjectWithoutKey(legacyInitial, ContentPackageIdentityKey);
         legacyJournal.addObject("initialState", legacyInitial);
         replayError.clear();
@@ -1270,6 +1340,16 @@ void testActionReplay()
     expect(!Replay::run(unavailableRulesetJournal, &replayError) &&
            replayError.find("removed-variant@3") != std::string::npos,
            "replay must reject an unavailable ruleset before applying any action");
+
+    JsonObject unavailableTopologyJournal = journal;
+    JsonObject unavailableTopology;
+    unavailableTopology.addString("id", "removed-duel");
+    unavailableTopology.addInteger("version", 3);
+    unavailableTopologyJournal.addObject(MatchTopologyIdentityKey, unavailableTopology);
+    replayError.clear();
+    expect(!Replay::run(unavailableTopologyJournal, &replayError) &&
+           replayError.find("removed-duel@3") != std::string::npos,
+           "replay must reject an unavailable topology before applying any action");
 
     JsonObject unavailablePackageJournal = journal;
     JsonObject unavailablePackage;
@@ -3756,6 +3836,11 @@ int runRecoverySelfTest()
         productionMetadata.getObject(RuneGameRulesetIdentityKey);
     const JsonObject* replayRuleset = replay ?
         replay->getObject(RuneGameRulesetIdentityKey) : nullptr;
+    const JsonObject* savedTopology = productionState.getObject(MatchTopologyIdentityKey);
+    const JsonObject* metadataTopology =
+        productionMetadata.getObject(MatchTopologyIdentityKey);
+    const JsonObject* replayTopology = replay ?
+        replay->getObject(MatchTopologyIdentityKey) : nullptr;
     const JsonObject* savedPackage = productionState.getObject(ContentPackageIdentityKey);
     const JsonObject* metadataPackage =
         productionMetadata.getObject(ContentPackageIdentityKey);
@@ -3781,6 +3866,13 @@ int runRecoverySelfTest()
         metadataRuleset->getInteger("version") == ClassicRuneGameRulesetVersion &&
         replayRuleset->getString("id") == ClassicRuneGameRulesetId &&
         replayRuleset->getInteger("version") == ClassicRuneGameRulesetVersion &&
+        savedTopology && metadataTopology && replayTopology &&
+        savedTopology->getString("id") == ClassicFreeForAllTopologyId &&
+        savedTopology->getInteger("version") == ClassicFreeForAllTopologyVersion &&
+        metadataTopology->getString("id") == ClassicFreeForAllTopologyId &&
+        metadataTopology->getInteger("version") == ClassicFreeForAllTopologyVersion &&
+        replayTopology->getString("id") == ClassicFreeForAllTopologyId &&
+        replayTopology->getInteger("version") == ClassicFreeForAllTopologyVersion &&
         savedPackage && metadataPackage && replayPackage &&
         savedPackage->getString("id") == ClassicContentPackageId &&
         savedPackage->getInteger("version") == ClassicContentPackageVersion &&
@@ -3805,6 +3897,7 @@ int runRecoverySelfTest()
         storedReplays[0].journal.actionCount == 1 &&
         storedReplays[0].journal.difficulty == "hard" &&
         storedReplays[0].journal.rulesetId == ClassicRuneGameRulesetId &&
+        storedReplays[0].journal.topologyId == ClassicFreeForAllTopologyId &&
         storedReplays[0].journal.contentPackageId == ClassicContentPackageId;
 
     const std::filesystem::path brokenReplay = replayDirectory / "broken.fwr";
@@ -3892,12 +3985,15 @@ int runRecoverySelfTest()
 
     JsonObject legacyState = jsonObjectWithoutKey(productionState,
                                                    RuneGameRulesetIdentityKey);
+    legacyState = jsonObjectWithoutKey(legacyState, MatchTopologyIdentityKey);
     legacyState = jsonObjectWithoutKey(legacyState, ContentPackageIdentityKey);
     std::string legacyError;
     valid = valid && Recovery::validateSaveState(legacyState, &legacyError) &&
         legacyError.empty() && GameData::restoreState(legacyState) &&
         activeRuneGameRuleset().id() == ClassicRuneGameRulesetId &&
-        activeRuneGameRuleset().version() == ClassicRuneGameRulesetVersion;
+        activeRuneGameRuleset().version() == ClassicRuneGameRulesetVersion &&
+        activeMatchTopology().id() == ClassicFreeForAllTopologyId &&
+        activeMatchTopology().version() == ClassicFreeForAllTopologyVersion;
 
     JsonObject incompatibleState = productionState;
     JsonObject incompatibleRuleset;
@@ -3911,6 +4007,20 @@ int runRecoverySelfTest()
         incompatibleError.find("removed-variant@3") != std::string::npos &&
         !GameData::restoreState(incompatibleState) &&
         GameData::authoritativeState().toString() == stateBeforeIncompatibleRestore;
+
+    JsonObject incompatibleTopologyState = productionState;
+    JsonObject incompatibleTopology;
+    incompatibleTopology.addString("id", "removed-duel");
+    incompatibleTopology.addInteger("version", 3);
+    incompatibleTopologyState.addObject(MatchTopologyIdentityKey, incompatibleTopology);
+    std::string incompatibleTopologyError;
+    const std::string stateBeforeIncompatibleTopologyRestore =
+        GameData::authoritativeState().toString();
+    valid = valid &&
+        !Recovery::validateSaveState(incompatibleTopologyState, &incompatibleTopologyError) &&
+        incompatibleTopologyError.find("removed-duel@3") != std::string::npos &&
+        !GameData::restoreState(incompatibleTopologyState) &&
+        GameData::authoritativeState().toString() == stateBeforeIncompatibleTopologyRestore;
 
     JsonObject incompatiblePackageState = productionState;
     JsonObject incompatiblePackage;
@@ -5376,6 +5486,7 @@ int main(int argc, char** argv)
 
     testDifficultyRules();
     testRuneGameRulesetIdentityContract();
+    testMatchTopologyIdentityContract();
     testContentPackageIdentityContract();
     testInstalledContentCatalog();
     testRuneGameRoundFlowRuleset();

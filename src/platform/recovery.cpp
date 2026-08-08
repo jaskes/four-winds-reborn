@@ -12,6 +12,7 @@
 
 #include "settings.h"
 #include "contentpackage.h"
+#include "matchtopology.h"
 #include "runegameruleset.h"
 #include "swe/swe_systems.h"
 
@@ -170,6 +171,9 @@ bool Recovery::validateSaveState(const SWE::JsonObject & state, std::string* err
     RuneGameRulesetIdentity ruleset;
     if(!resolveRuneGameRulesetIdentity(state, ruleset, true, error)) return false;
 
+    MatchTopologyIdentity topology;
+    if(!resolveMatchTopologyIdentity(state, topology, true, error)) return false;
+
     ContentPackageIdentity package;
     if(!resolveContentPackageIdentity(state, package, true, error)) return false;
 
@@ -323,6 +327,17 @@ Recovery::CheckpointInfo Recovery::inspectCheckpoint(const std::string & directo
     if(!sameRuneGameRuleset(stateRuleset, metadataRuleset))
     {
         info.error = "save and recovery metadata use different Rune Game rulesets";
+        return info;
+    }
+
+    MatchTopologyIdentity stateTopology;
+    MatchTopologyIdentity metadataTopology;
+    if(!resolveMatchTopologyIdentity(state, stateTopology, true, &info.error) ||
+       !resolveMatchTopologyIdentity(metadata, metadataTopology, true, &info.error))
+        return info;
+    if(!sameMatchTopology(stateTopology, metadataTopology))
+    {
+        info.error = "save and recovery metadata use different match topologies";
         return info;
     }
 

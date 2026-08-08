@@ -180,6 +180,7 @@ set(FOUR_WINDS_SOURCE
     src/rules/developerfixtures.cpp
     src/rules/gamestateio.cpp
     src/rules/gameplayrng.cpp
+    src/rules/matchtopology.cpp
     src/rules/matchscore.cpp
     src/rules/playerstate.cpp
     src/rules/replay.cpp

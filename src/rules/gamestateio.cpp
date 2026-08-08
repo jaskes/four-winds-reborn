@@ -31,6 +31,7 @@
 #include "crashreport.h"
 #include "gamedata.h"
 #include "gameplayrng.h"
+#include "matchtopology.h"
 #include "recovery.h"
 #include "replayfiles.h"
 #include "savegames.h"
@@ -123,6 +124,8 @@ namespace GameData
         jo.addInteger("version", FORMAT_VERSION_CURRENT);
         jo.addObject(RuneGameRulesetIdentityKey,
                      runeGameRulesetIdentityJson(activeRuneGameRuleset()));
+        jo.addObject(MatchTopologyIdentityKey,
+                     matchTopologyIdentityJson(activeMatchTopology()));
         jo.addObject(ContentPackageIdentityKey,
                      contentPackageIdentityJson(activeContentPackageManifest()));
         jo.addString("wind:round", roundWind.toString());
@@ -190,6 +193,13 @@ namespace GameData
 
         RuneGameRulesetIdentity loadedRuleset;
         if(!resolveRuneGameRulesetIdentity(jo, loadedRuleset, true, &validationError))
+        {
+            ERROR("invalid saved game: " << validationError);
+            return false;
+        }
+
+        MatchTopologyIdentity loadedTopology;
+        if(!resolveMatchTopologyIdentity(jo, loadedTopology, true, &validationError))
         {
             ERROR("invalid saved game: " << validationError);
             return false;
@@ -337,6 +347,12 @@ namespace GameData
             ERROR("invalid saved game: " << validationError);
             return false;
         }
+        if(!selectActiveMatchTopology(loadedTopology.id, loadedTopology.version,
+                                      &validationError))
+        {
+            ERROR("invalid saved game: " << validationError);
+            return false;
+        }
 
         return true;
     }
@@ -390,6 +406,8 @@ namespace GameData
         metadata.addInteger("saveFormat", FORMAT_VERSION_CURRENT);
         metadata.addObject(RuneGameRulesetIdentityKey,
                            runeGameRulesetIdentityJson(activeRuneGameRuleset()));
+        metadata.addObject(MatchTopologyIdentityKey,
+                           matchTopologyIdentityJson(activeMatchTopology()));
         metadata.addObject(ContentPackageIdentityKey,
                            contentPackageIdentityJson(activeContentPackageManifest()));
         metadata.addString("savedAtEpoch", std::to_string(static_cast<long long>(std::time(nullptr))));

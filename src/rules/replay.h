@@ -43,6 +43,8 @@ namespace Replay
         std::string difficulty;
         std::string rulesetId;
         int         rulesetVersion = 0;
+        std::string topologyId;
+        int         topologyVersion = 0;
         std::string contentPackageId;
         int         contentPackageVersion = 0;
         bool        contiguousToCheckpoint = false;
