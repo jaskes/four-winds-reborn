@@ -25,6 +25,8 @@
 
 #include "settings.h"
 #include "gametheme.h"
+#include "matchtopology.h"
+#include "matchpresentation.h"
 #include "actions.h"
 #include "mahjongsummarypart.h"
 
@@ -110,47 +112,22 @@ MahjongSummaryPartScreen::MahjongSummaryPartScreen() : JsonWindow("screen_mahjon
 	    labels.back().text = StringFormat(_("%1 (%2) wins from %3")).arg(winAvatarName).arg(winWindName).arg(dealAvatarName);
     }
 
-    const RemotePlayer & remoteEast = ld.playerOfWind(Wind::East);
-    const RemotePlayer & remoteSouth = ld.playerOfWind(Wind::South);
-    const RemotePlayer & remoteWest = ld.playerOfWind(Wind::West);
-    const RemotePlayer & remoteNorth = ld.playerOfWind(Wind::North);
-
-    labels.push_back(GameTheme::jsonTextInfo(jobject, "textinfo:avatar1"));
-    labels.back().text = GameData::avatarInfo(remoteEast.avatar).name;
-
-    labels.push_back(GameTheme::jsonTextInfo(jobject, "textinfo:avatar2"));
-    labels.back().text = GameData::avatarInfo(remoteSouth.avatar).name;
-
-    labels.push_back(GameTheme::jsonTextInfo(jobject, "textinfo:avatar3"));
-    labels.back().text = GameData::avatarInfo(remoteWest.avatar).name;
-
-    labels.push_back(GameTheme::jsonTextInfo(jobject, "textinfo:avatar4"));
-    labels.back().text = GameData::avatarInfo(remoteNorth.avatar).name;
-
-    labels.push_back(GameTheme::jsonTextInfo(jobject, "textinfo:clan1"));
-    labels.back().text = GameData::clanInfo(remoteEast.clan).name;
-
-    labels.push_back(GameTheme::jsonTextInfo(jobject, "textinfo:clan2"));
-    labels.back().text = GameData::clanInfo(remoteSouth.clan).name;
-
-    labels.push_back(GameTheme::jsonTextInfo(jobject, "textinfo:clan3"));
-    labels.back().text = GameData::clanInfo(remoteWest.clan).name;
-
-    labels.push_back(GameTheme::jsonTextInfo(jobject, "textinfo:clan4"));
-    labels.back().text = GameData::clanInfo(remoteNorth.clan).name;
-
-    labels.push_back(GameTheme::jsonTextInfo(jobject, "textinfo:spell1"));
-    labels.back().text = String::number(remoteEast.points);
-
-    labels.push_back(GameTheme::jsonTextInfo(jobject, "textinfo:spell2"));
-    labels.back().text = String::number(remoteSouth.points);
-
-    labels.push_back(GameTheme::jsonTextInfo(jobject, "textinfo:spell3"));
-    labels.back().text = String::number(remoteWest.points);
-
-    labels.push_back(GameTheme::jsonTextInfo(jobject, "textinfo:spell4"));
-    labels.back().text = String::number(remoteNorth.points);
-
+    int playerIndex = 1;
+    for(const auto wind : activeMatchTopology().winds())
+    {
+        const RemotePlayer & player = ld.playerOfWind(wind);
+        const std::string suffix = std::to_string(playerIndex++);
+        labels.push_back(GameTheme::jsonTextInfo(jobject, "textinfo:avatar" + suffix));
+        labels.back().text = GameData::avatarInfo(player.avatar).name;
+        labels.push_back(GameTheme::jsonTextInfo(jobject, "textinfo:clan" + suffix));
+        labels.back().text = GameData::clanInfo(player.clan).name;
+        labels.push_back(GameTheme::jsonTextInfo(jobject, "textinfo:spell" + suffix));
+        labels.back().text = String::number(player.points);
+    }
+    if(MatchPresentation::duel() || MatchPresentation::teams())
+        labels.erase(std::remove_if(labels.begin(), labels.end(), [](const JsonTextInfo & label) {
+            return label.position.x > 450 && label.position.y >= 500;
+        }), labels.end());
     buttonNext = buttons.findIds("but_done");
     if(buttonNext)
 	buttonNext->setAction(Action::ButtonDone);
@@ -171,6 +148,31 @@ void MahjongSummaryPartScreen::renderWindow(void)
 
    for(auto & label : labels)
         renderTextInfo(label);
+
+    if(MatchPresentation::duel() || MatchPresentation::teams())
+    {
+        using namespace MatchPresentation;
+        card(*this, Rect(500, 500, 511, 206), Color(107, 99, 70));
+        text(*this, modeName(), Point(755, 510), 480);
+        const Persons players = ld.toPersons();
+        const int columnWidth = 360 / static_cast<int>(players.size());
+        text(*this, _("Spell Points"), Point(510, 615), 134, ink(), 16, AlignLeft);
+        text(*this, _("Land Claims"), Point(510, 663), 134, ink(), 16, AlignLeft);
+        int column = 0;
+        for(const Person & person : players)
+        {
+            const RemotePlayer & player = ld.playerOfWind(person.wind);
+            const int x = 646 + columnWidth * column++ + columnWidth / 2;
+            text(*this, player.name(), Point(x, 549), columnWidth - 4, sideColor(side(player)), 18);
+            text(*this, teams() ? teamName(side(player)) : role(player), Point(x, 578), columnWidth - 4, sideColor(side(player)), 14);
+            text(*this, String::number(player.points), Point(x, 615), columnWidth - 4);
+            int claims = 0;
+            for(const Person & opponent : players)
+                if(!activeMatchTopology().alliedByClan(player.clan(), opponent.clan()))
+                    claims += player.landClaimPoints(opponent.clan);
+            text(*this, String::number(claims), Point(x, 663), columnWidth - 4);
+        }
+    }
 }
 
 void MahjongSummaryPartScreen::renderWinStones(void)

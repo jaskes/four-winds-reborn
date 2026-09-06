@@ -124,7 +124,12 @@ void MahjongPartScreen::tickEvent(u32 ms)
     {
 	// Presentation actions can deliberately remain queued while an animation runs.
 	// Consume them before asking the authoritative state for another action.
-	if(actions.empty()) GameData::mahjong2Client(myAvatar, actions);
+	if(actions.empty())
+	{
+	    const bool switched = selectLocalAvatar();
+	    GameData::mahjong2Client(myAvatar, actions);
+	    if(switched && actions.empty()) renderWindow();
+	}
 	bool redraw = false;
 
 	while(actions.size())
@@ -232,6 +237,37 @@ bool MahjongPartScreen::actionMahjongLoadData(void)
     syncAffectedSpellIndicators();
 
     return true;
+}
+
+bool MahjongPartScreen::selectLocalAvatar(void)
+{
+    const Avatar selected = GameData::localMahjongAvatar();
+    if(!selected.isValid() || selected == myAvatar) return false;
+
+    myAvatar = selected;
+    ld = GameData::toLocalData(myAvatar);
+    stoneSelected = -1;
+    variantSelected = -1;
+    refreshDiscardClaimButtons();
+    syncAffectedSpellIndicators();
+    return true;
+}
+
+void MahjongPartScreen::refreshDiscardClaimButtons(void)
+{
+    const bool mayClaimDiscard = ld.dropStone.isValid() && !ld.yourTurn();
+    LocalPlayer & player = ld.myPlayer();
+    WinResults result;
+
+    buttonPass->setVisible(ld.dropStone.isValid());
+    buttonGame->setVisible(mayClaimDiscard &&
+        player.isWinMahjong(ld.currentWind, ld.roundWind, ld.dropStone, &result));
+    buttonKong->setVisible(mayClaimDiscard &&
+        player.isMahjongKong1(ld.currentWind, ld.dropStone));
+    buttonPung->setVisible(mayClaimDiscard &&
+        player.isMahjongPung(ld.currentWind, ld.dropStone));
+    buttonChao->setVisible(mayClaimDiscard &&
+        player.isMahjongChao(ld.currentWind, ld.dropStone));
 }
 
 bool MahjongPartScreen::actionMahjongLuckChoice(const ActionMessage & v)
@@ -551,23 +587,7 @@ bool MahjongPartScreen::actionMahjongDrop(const ActionMessage & v)
     ld.dropStone = action.dropStone();
 
     LocalPlayer & player = ld.myPlayer();
-
-    // The dropper cannot claim their own discard. The local snapshot still
-    // contains the just-discarded drawn rune until MahjongData is applied,
-    // which previously produced a one-frame phantom Game button before the
-    // dropper's automatic Pass resolved competing AI calls.
-    const bool mayClaimDiscard = !ld.yourTurn();
-    bool showChao = mayClaimDiscard && player.isMahjongChao(ld.currentWind, ld.dropStone);
-    bool showPung = mayClaimDiscard && player.isMahjongPung(ld.currentWind, ld.dropStone);
-    bool showKong = mayClaimDiscard && player.isMahjongKong1(ld.currentWind, ld.dropStone);
-    bool showGame = mayClaimDiscard &&
-	player.isWinMahjong(ld.currentWind, ld.roundWind, ld.dropStone, & ld.winResult);
-
-    buttonPass->setVisible(true);
-    buttonGame->setVisible(showGame);
-    buttonKong->setVisible(showKong);
-    buttonPung->setVisible(showPung);
-    buttonChao->setVisible(showChao);
+    refreshDiscardClaimButtons();
 
     player.newStone.reset();
     stoneSelected = -1;
@@ -666,7 +686,7 @@ bool MahjongPartScreen::actionMahjongCast(const ActionMessage & v)
 	    const CreatureInfo & creatureInfo = GameData::creatureInfo(*target);
 	    std::string tmp;
 
-	    if(owner.clan != target->clan())
+	    if(!GameData::allied(owner.clan, target->clan()))
 		tmp = StringFormat(_("%1 casts %2 at %3's %4")).
 		    arg(owner.name()).arg(spellInfo.name).arg(ld.playerOfClan(target->clan()).name()).arg(creatureInfo.name);
 	    else

@@ -9,6 +9,9 @@ The public project overview and short roadmap live in the repository
 authority for implemented behaviour; the documents below explain the contracts
 and evidence that should change with them.
 
+The [v0.5.0 candidate review](RCReview-v0.5.0.md) records the local-mode fixes,
+two-player Duel contract, verification evidence and remaining manual checks.
+
 ## Rules and contracts
 
 - [`RulesDecisions.md`](RulesDecisions.md) — intentional decisions where

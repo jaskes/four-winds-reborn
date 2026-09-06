@@ -60,7 +60,8 @@ namespace
     {
         int result = 0;
         for(const Land & border : GameData::landInfo(land).borders)
-            if(!border.isTowerWinds() && GameData::landInfo(border).clan == clan) result++;
+            if(!border.isTowerWinds() &&
+               GameData::allied(GameData::landInfo(border).clan, clan)) result++;
         return result;
     }
 
@@ -71,7 +72,7 @@ namespace
         {
             if(border.isTowerWinds()) continue;
             const Clan owner = GameData::landInfo(border).clan;
-            if(owner.isValid() && owner != clan) result++;
+            if(owner.isValid() && !GameData::allied(owner, clan)) result++;
         }
         return result;
     }
@@ -144,7 +145,8 @@ namespace
 
             const Clan destinationOwner = GameData::landInfo(destination).clan;
             AI::BattleForecast forecast;
-            if(destinationOwner.isValid() && destinationOwner != player.clan)
+            if(destinationOwner.isValid() &&
+               !GameData::allied(destinationOwner, player.clan))
             {
                 forecast = forecastLandBattle(party, destination, profile,
                                               defendingProfile(destination), difficulty);
@@ -317,7 +319,7 @@ AI::AdventureMovePlan AI::chooseAdventureMove(const RemotePlayer & player, const
         if(!land.isValid() || land.isTowerWinds()) continue;
 
         const LandInfo & info = GameData::landInfo(land);
-        if(!info.clan.isValid() || info.clan == player.clan) continue;
+        if(!info.clan.isValid() || GameData::allied(info.clan, player.clan)) continue;
 
         const Lands path = Lands::pathfind(party.land(), land);
         if(path.empty()) continue;
@@ -329,7 +331,8 @@ AI::AdventureMovePlan AI::chooseAdventureMove(const RemotePlayer & player, const
         if(!destination.isValid()) continue;
 
         const bool engagesEnemy = GameData::landInfo(destination).clan.isValid() &&
-                                  GameData::landInfo(destination).clan != player.clan;
+                                  !GameData::allied(GameData::landInfo(destination).clan,
+                                                    player.clan);
         BattleForecast forecast = engagesEnemy ? immediateForecast :
             forecastLandBattle(party, land, profile, defendingProfile(land), difficulty);
         if(!forecast.isValid()) continue;
@@ -377,7 +380,7 @@ std::vector<AI::AdventureThreat> AI::predictAdventureThreats(const RemotePlayer 
 
         for(const auto & enemy : GameData::gamers)
         {
-            if(enemy.clan == player.clan) continue;
+            if(GameData::allied(enemy.clan, player.clan)) continue;
             const BehaviorProfile enemyProfile = enemy.isAI() ? behaviorProfile(enemy) :
                                                    BehaviorProfile::Balanced;
 
@@ -542,7 +545,8 @@ AI::AdventureTurnPlan AI::chooseAdventureTurn(const RemotePlayer & player, Behav
         {
             const Land land(landId);
             const Clan owner = GameData::landInfo(land).clan;
-            if(land.isTowerWinds() || !owner.isValid() || owner == player.clan) continue;
+            if(land.isTowerWinds() || !owner.isValid() ||
+               GameData::allied(owner, player.clan)) continue;
             if(targetAssignments[land()] < partiesPerTarget) targets.push_back(land);
         }
 

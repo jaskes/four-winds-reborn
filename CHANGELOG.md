@@ -11,6 +11,66 @@ so that commit, rather than GitHub fork metadata, is the comparison baseline.
 The project retains the original credits and license. Entries below describe
 Reborn work only; they do not claim authorship of inherited code or assets.
 
+## [0.5.0] - 2026-09-06
+
+Source milestone for the completed local match modes. The source is frozen in
+`main` and tag `v0.5.0`; GitHub Release publication and downloadable release
+packages are deferred.
+
+### Added - local match modes and rulesets
+
+- Added a versioned match-topology contract independent from Rune Game rules,
+  persisted in saves, recovery checkpoints, replays and simulation artifacts.
+- Added the Quick ruleset, which plays only the East round: four hands in
+  Classic/Coalition, or two hands in Duel.
+- Added two-player Duel (`duel@2`): one local player against one AI, one hand
+  each, opposite East/West seats, and half of the island owned by each wizard.
+  Classic-length Duel plays eight hands across four rounds. The first
+  four-hand implementation (`duel@1`) remains available for existing saves.
+- Added Coalition: four controllers remain active, with fixed Red/Purple and
+  Yellow/Aqua teams sharing score and victory.
+- Added localized Match Mode and Rune Game Rules selectors to Settings.
+- Added two-player rosters, rune table, island status and summaries, plus
+  colour-coded Coalition teams and a shared final score for each team.
+- Added a dedicated ornate Reborn Duel table, transparent wind artwork,
+  visible rule guardians with consistent animation positions, and a compact
+  discard history for long two-player hands.
+
+### Fixed - candidate review
+
+- Fixed clipped setting values in the compact menu and clarified that
+  Continue preserves the saved match mode.
+- Fixed loss of the selected rune after continuing a legacy Duel's second
+  hand, automatic Pass that skipped that hand's claim, and a disabled Done
+  button when Adventure control moved to the second local clan.
+- Reset original land owners when starting a four-player game after a Duel.
+- Added native rendered UI regressions and full two-player match/replay checks.
+- Rejected damaged saves before changing the live match or replacing a valid
+  autosave; validate RNG and pending battle phases during save inspection.
+- Restored original island ownership when loading saves predating persisted
+  captures, including after a two-player Duel.
+- Restricted Unfair AI land-claim income and Duel scoring to participating clans.
+- Kept the completed match intact when a request for another hand is refused.
+- Updated developer final-round fixtures and island inspection for Quick and
+  two-player Duel; added state integrity and mode/difficulty replay matrices.
+- Preserved action-log ownership on Continue and accepted legacy clan aliases
+  consistently during recovery validation.
+
+### Changed - topology-aware gameplay
+
+- Local ownership, AI decisions, hostile spell targeting, Adventure movement,
+  land occupation and score summaries now respect controller and team
+  topology. Allies cannot attack, target one another with hostile magic or
+  occupy each other's land.
+- Legacy data without topology metadata continues to load as versioned Classic
+  free for all; invalid or incompatible topology data is rejected explicitly.
+
+### Changed - Android ergonomics
+
+- Small legacy buttons now receive Android-only touch slop up to a 44-pixel
+  logical target without changing art, layout, saves or desktop mouse input.
+- Advanced the Android package contract to versionCode 500 for v0.5.x.
+
 ## [0.4.0] - 2026-08-07
 
 ### Added - Android foundation

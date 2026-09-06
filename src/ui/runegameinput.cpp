@@ -356,7 +356,9 @@ void MahjongPartScreen::actionDropSelected(void)
         if(submitHumanAction(ClientDropIndex(stoneSelected)))
         {
             retireTurnTimeout();
-            buttonPass->setClicked();
+            // Legacy four-hand Duel must offer the discard to the partner.
+            if(GameData::localMahjongAvatar() == myAvatar)
+                buttonPass->setClicked();
             stoneSelected = -1;
         }
     }

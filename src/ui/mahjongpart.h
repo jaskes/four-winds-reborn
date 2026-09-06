@@ -49,6 +49,7 @@ public:
     OrderTurn(const JsonObject &);
 
     void		render(Window &, const Wind &, const Wind &, const Wind &) const;
+    void                renderSeat(Window &, const Point &, const Wind &, bool) const;
 };
 
 struct TurnAnimation : SpritesAnimation
@@ -68,7 +69,7 @@ struct TurnAnimation : SpritesAnimation
 
 class MahjongPartScreen : public JsonWindow
 {
-    const Avatar	myAvatar;
+    Avatar		myAvatar;
     LocalData		ld;
     UnicodeList		gameLogs;
 
@@ -140,6 +141,8 @@ class MahjongPartScreen : public JsonWindow
     TickTrigger		tt;
 
     void		actionButtonLocalReady(void);
+    bool                selectLocalAvatar(void);
+    void                refreshDiscardClaimButtons(void);
     bool                submitHumanAction(const ClientMessage &);
     void                showActionRejection(const ActionRejection &);
     void                retireTurnTimeout(void);
@@ -169,6 +172,7 @@ class MahjongPartScreen : public JsonWindow
 
     void		renderNames(void);
     void		renderNamesHorizontal(const RemotePlayer &, const Point &);
+    void                renderDuelName(const RemotePlayer &, const Point &);
     void		renderNamesVertical(const RemotePlayer &, const Point &);
     void		renderScryRunes(void);
     void		renderScryVertical(const Stones &, const Point &);

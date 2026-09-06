@@ -25,6 +25,7 @@
 #include "gametheme.h"
 #include "actions.h"
 #include "showplayers.h"
+#include "matchpresentation.h"
 
 bool sortPersonsByWind(const Person & p1, const Person & p2)
 {
@@ -111,7 +112,8 @@ Size ShowPlayersScreen::renderPerson(const Person & user, bool selected, const P
     const FontRender & frs = GameTheme::fontRender(font);
 
     renderText(frs, avatarInfo.name, color, Point(posx1, center.y + 10), AlignRight);
-    renderText(frs, (user.isAI() ? "AI" : "Human"), color, Point(posx1, center.y + 70), AlignRight);
+    renderText(frs, (GameData::usesAI(user) ? "AI" : "Human"), color,
+               Point(posx1, center.y + 70), AlignRight);
     renderText(frs, clanInfo.name, color, Point(posx2, center.y + 10));
     renderText(frs, windInfo.name, color, Point(posx2, center.y + 70));
 
@@ -122,12 +124,45 @@ void ShowPlayersScreen::renderWindow(void)
 {
     JsonWindow::renderWindow();
 
+    if(MatchPresentation::duel() || MatchPresentation::teams())
+    {
+        using namespace MatchPresentation;
+        text(*this, modeName() + " / " + rulesName(), Point(width() / 2, 24), 950, ink(), 26);
+        text(*this, duel() ? _("Two players. One hand each. Half the island each.") :
+             _("Four players. Two teams. Shared score and victory."), Point(width() / 2, 66), 950);
+        for(const Person & user : persons)
+        {
+            const int team = side(user);
+            int member = 0;
+            for(const Person & preceding : persons)
+            {
+                if(preceding.avatar == user.avatar) break;
+                if(side(preceding) == team) ++member;
+            }
+            const int x = 36 + team * 488;
+            const int y = duel() ? 176 : 150 + member * 254;
+            card(*this, Rect(x, y, 464, duel() ? 384 : 234), sideColor(team));
+            const auto & info = GameData::avatarInfo(user.avatar);
+            renderTexture(GameTheme::texture(info.portrait), Point(x + 24, y + 48));
+            renderTexture(GameTheme::texture(GameData::clanInfo(user.clan).button), Point(x + 340, y + 88));
+            text(*this, duel() ? role(user) : teamName(team) + " / " + role(user), Point(x + 232, y + 12), 430, sideColor(team));
+            text(*this, info.name, Point(x + 306, y + 50), 260, ink(), 26);
+            text(*this, GameData::clanInfo(user.clan).name, Point(x + 232, y + 196), 420);
+            if(duel())
+            {
+                text(*this, team == 0 ? _("Western half") : _("Eastern half"), Point(x + 232, y + 270), 420, sideColor(team), 26);
+                text(*this, _("One rune hand"), Point(x + 232, y + 314), 420);
+            }
+        }
+        return;
+    }
+
     const Person & selectedPerson = GameData::myPerson();
     Point center = Point(width() / 2, 40);
 
     for(auto & user : persons)
     {
-	auto sz = renderPerson(user, user.avatar == selectedPerson.avatar, center);
+	auto sz = renderPerson(user, GameData::isLocallyControlled(user), center);
 	center.y += sz.h + 20;
     }
 }

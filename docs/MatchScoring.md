@@ -15,7 +15,7 @@ Each player receives five raw category scores:
 | Summon Circle | Number of owned territories marked as summoning circles |
 | Unit | Sum of the summon costs of all surviving creatures |
 | Spell Point | Unspent spell points |
-| Land Claim | Unspent land-claim points against all three opposing clans |
+| Land Claim | Unspent land-claim points against opposing clans (allies excluded) |
 
 Negative resource values are clamped to zero. Stable avatar, clan and wind IDs
 identify a player; display names are never used as identity. Canonical faction
@@ -43,3 +43,17 @@ The original 1998 executable and installed Win98 saves are useful behavioral
 references, but no recoverable source-level final-map scoring contract exists in
 the inherited engine. This documented Reborn contract is therefore explicit
 instead of presenting an uncertain reverse-engineering guess as classic fact.
+
+## Duel and Coalition
+
+Two-player Duel ranks the two active players in each category, awarding 2 or
+1 standing points (2 each on a tie). Its total is the sum over five categories.
+Coalition first calculates each of the four players' category standing points,
+then sums the two allies' totals into their shared team score. Team ranks and
+victory compare those two team totals. A tied match shows both sides as winners.
+
+The Duel/Coalition result screen has two columns, one per player/team. Each
+category shows its raw score and awarded standing points; in Coalition both
+are sums of the two allies' values. The displayed final score equals the sum
+of the five displayed point awards. Classic keeps its existing four-player
+score/rank table.

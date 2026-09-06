@@ -195,7 +195,7 @@ bool GameData::adventureBattleAction(const Avatar & avatar, ActionList & actions
 	LocalPlayer & other = playerOfClan(landInfo.clan);
 
 	// all armies moved to dest: need check clan
-	if(player.clan != other.clan)
+	if(!GameData::allied(player, other))
 	{
 	    BattleParty* defenders = other.army.findParty(land);
 	    BattleTown town = BattleTown(land);

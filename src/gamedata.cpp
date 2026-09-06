@@ -33,6 +33,7 @@
 #include "battlesession.h"
 #include "crashreport.h"
 #include "gamedata.h"
+#include "matchtopology.h"
 #include "replay.h"
 #include "runegameruleset.h"
 
@@ -326,7 +327,8 @@ const BattleCreature* LocalData::findBattleUnitConst(int unit) const
 Persons LocalData::toPersons(void) const
 {
     Persons res;
-    res.assign(players.begin(), players.end());
+    for(const LocalPlayer & player : players)
+        if(player.avatar.isValid()) res.push_back(player);
     return res;
 }
 
@@ -365,16 +367,15 @@ namespace GameData
         {
             // Developer autoplay still represents the human seat. Only actual AI
             // opponents receive the deliberately asymmetric Unfair economy.
-            if(!player.isAI()) continue;
+            if(!usesAI(player)) continue;
 
             player.points += spellPoints;
             if(!initial && rules.mahjongPartAiLandClaimBonus > 0)
             {
-                for(const auto clanId : clans_all)
+                for(const LocalPlayer & opponent : gamers)
                 {
-                    const Clan clan(clanId);
-                    if(clan != player.clan)
-                        player.addLandClaimPoints(clan, rules.mahjongPartAiLandClaimBonus);
+                    if(!allied(opponent.clan, player.clan))
+                        player.addLandClaimPoints(opponent.clan, rules.mahjongPartAiLandClaimBonus);
                 }
             }
         }
@@ -401,7 +402,9 @@ bool GameData::isGameOver(void)
 
 bool GameData::isGameOver(const RuneGameRuleset & ruleset)
 {
-    return ruleset.advanceRound(roundWind(), partWind()).complete;
+    const int lastDeal = activeMatchTopology().seatCount() == 2 && partWind == Wind(Wind::West) ?
+        Wind::North : partWind();
+    return ruleset.advanceRound(roundWind(), lastDeal).complete;
 }
 
 std::list<BattleLegend> GameData::getBattleHistoryFor(const Avatar & avatar)
@@ -450,6 +453,55 @@ const LocalPlayers & GameData::players(void)
     return gamers;
 }
 
+Avatar GameData::localMahjongAvatar(void)
+{
+    const LocalPlayer & current = playerOfWind(currentWind);
+
+    // During an owned turn the controller must see and act with that hand,
+    // regardless of which of its two Duel seats was selected initially.
+    if(!dropStone.isValid() && isLocallyControlled(current) && !usesAI(current))
+        return current.avatar;
+
+    // Once a rune has been discarded, select the controller-owned opponent
+    // that can answer it.  There is only one such opponent in Duel, but the
+    // ordered scan also makes this deterministic for future topologies.
+    if(dropStone.isValid())
+    {
+        const RuneGameRuleset & ruleset = activeRuneGameRuleset();
+        const auto claimPriority = [&](const LocalPlayer & player) {
+            WinResults result;
+            if(player.isWinMahjong(currentWind, roundWind, dropStone, &result, ruleset)) return 4;
+            if(player.isMahjongKong1(currentWind, dropStone, ruleset)) return 3;
+            if(player.isMahjongPung(currentWind, dropStone, ruleset)) return 2;
+            if(player.isMahjongChao(currentWind, dropStone, ruleset)) return 1;
+            return 0;
+        };
+
+        const LocalPlayer* selected = nullptr;
+        int selectedPriority = -1;
+        for(const LocalPlayer & player : gamers)
+        {
+            if(player.wind == currentWind || !isLocallyControlled(player) || usesAI(player))
+                continue;
+            const int priority = claimPriority(player);
+            if(selectedPriority < priority)
+            {
+                selected = &player;
+                selectedPriority = priority;
+            }
+        }
+        if(selected) return selected->avatar;
+    }
+
+    return person.avatar;
+}
+
+Avatar GameData::localAdventureAvatar(void)
+{
+    const LocalPlayer & current = playerOfWind(currentWind);
+    return isLocallyControlled(current) && !usesAI(current) ? current.avatar : person.avatar;
+}
+
 AI::Difficulty GameData::aiDifficulty(void)
 {
     return difficulty;
@@ -462,12 +514,52 @@ void GameData::setAIDifficulty(AI::Difficulty value)
 
 bool GameData::usesAI(const Person & player)
 {
+    if(isLocallyControlled(player))
+    {
+#ifdef BUILD_DEBUG
+        return developerAutoplayAvatar.isValid() && player.avatar == developerAutoplayAvatar;
+#else
+        return false;
+#endif
+    }
 #ifdef BUILD_DEBUG
     return player.isAI() || (developerAutoplayAvatar.isValid() &&
                              player.avatar == developerAutoplayAvatar);
 #else
     return player.isAI();
 #endif
+}
+
+int GameData::localControllerId(void)
+{
+    // Headless/simulation games intentionally store an AI seat as the local
+    // reference person.  It must not turn that controller (and, in Duel, its
+    // partner hand) into a human-controlled seat.
+    return !person.isAI() && person.clan.isValid() ?
+        activeMatchTopology().controllerForClan(person.clan()) : -1;
+}
+
+bool GameData::isLocallyControlled(const Person & player)
+{
+    const int local = localControllerId();
+    return 0 <= local && player.clan.isValid() &&
+           activeMatchTopology().controllerForClan(player.clan()) == local;
+}
+
+bool GameData::allied(const Person & first, const Person & second)
+{
+    return first.clan.isValid() && second.clan.isValid() &&
+           activeMatchTopology().alliedByClan(first.clan(), second.clan());
+}
+
+bool GameData::allied(const Clan & first, const Clan & second)
+{
+    if(!first.isValid() || !second.isValid()) return false;
+    if(first == second) return true;
+
+    const LocalPlayer* firstPlayer = gamers.playerOfClan(first);
+    const LocalPlayer* secondPlayer = gamers.playerOfClan(second);
+    return firstPlayer && secondPlayer && allied(*firstPlayer, *secondPlayer);
 }
 
 bool GameData::developerAssisted(void)
@@ -559,11 +651,13 @@ LocalData GameData::toLocalData(const Avatar & ava)
 
     lp = gamers.playerOfWind(ld.compass.left());
     if(lp) ld.players[0] = *lp;
-    else ERROR("player not found" << ", wind: " << ld.compass.left().toString());
+    else if(activeMatchTopology().hasWind(ld.compass.left()()))
+        ERROR("player not found" << ", wind: " << ld.compass.left().toString());
 
     lp = gamers.playerOfWind(ld.compass.right());
     if(lp) ld.players[1] = *lp;
-    else ERROR("player not found" << ", wind: " << ld.compass.right().toString());
+    else if(activeMatchTopology().hasWind(ld.compass.right()()))
+        ERROR("player not found" << ", wind: " << ld.compass.right().toString());
 
     lp = gamers.playerOfWind(ld.compass.top());
     if(lp) ld.players[2] = *lp;
@@ -681,9 +775,21 @@ void GameData::initPersons(const Person & cur)
     Replay::clearActionJournal();
     Persons persons(cur);
     gamers.setPersons(persons);
+    const LocalPlayer* selected = gamers.playerOfAvatar(cur.avatar);
+    person = selected ? static_cast<const Person &>(*selected) : cur;
+    if(activeMatchTopology().seatCount() == 2)
+    {
+        // Keep the chosen wizard as the local reference when seated West.
+        std::rotate(persons.begin(), std::find_if(persons.begin(), persons.end(),
+            [&](const Person & p) { return p.avatar == person.avatar; }), persons.end());
+        initPersons(persons);
+        return;
+    }
+    // Restore all four original territories when starting after a Duel.
+    if(initialLandOwners.size() == landsInfo.size())
+        for(std::size_t index = 0; index < landsInfo.size(); ++index)
+            landsInfo[index].clan = initialLandOwners[index];
     grantAiDifficultyIncome(true);
-
-    person = cur;
     roundWind = Wind(Wind::None);
     partWind = Wind(Wind::None);
     currentWind = Wind(Wind::None);
@@ -696,7 +802,8 @@ void GameData::initPersons(const Person & cur)
 
 bool GameData::initPersons(const Persons & configured)
 {
-    if(configured.size() != winds_all.size()) return false;
+    const MatchTopology & topology = activeMatchTopology();
+    if(configured.size() != static_cast<std::size_t>(topology.seatCount())) return false;
 
     std::set<int> avatars;
     std::set<int> clans;
@@ -709,6 +816,7 @@ bool GameData::initPersons(const Persons & configured)
            !configuredPerson.clan.isValid() || !configuredPerson.wind.isValid() ||
            !avatars.insert(configuredPerson.avatar()).second ||
            !clans.insert(configuredPerson.clan()).second ||
+           !topology.hasWind(configuredPerson.wind()) ||
            !winds.insert(configuredPerson.wind()).second)
             return false;
 
@@ -721,10 +829,13 @@ bool GameData::initPersons(const Persons & configured)
         persons.push_back(clean);
     }
 
+    if(topology.seatCount() == 2 &&
+       topology.alliedByClan(persons[0].clan(), persons[1].clan())) return false;
+
     Replay::clearActionJournal();
     gamers.setPersons(persons);
-    grantAiDifficultyIncome(true);
     person = persons.front();
+    grantAiDifficultyIncome(true);
     roundWind = Wind(Wind::None);
     partWind = Wind(Wind::None);
     currentWind = Wind(Wind::None);
@@ -748,7 +859,13 @@ bool GameData::initPersons(const Persons & configured)
     if(initialLandOwners.size() == landsInfo.size())
     {
         for(std::size_t index = 0; index < landsInfo.size(); ++index)
+        {
             landsInfo[index].clan = initialLandOwners[index];
+            if(topology.seatCount() == 2 && initialLandOwners[index].isValid())
+                for(const Person & owner : persons)
+                    if(topology.alliedByClan(initialLandOwners[index](), owner.clan()))
+                        landsInfo[index].clan = owner.clan;
+        }
     }
 
     return true;
@@ -761,6 +878,22 @@ bool GameData::initMahjong(void)
 
 bool GameData::initMahjong(const RuneGameRuleset & ruleset)
 {
+    RuneGameRoundAdvance advance = ruleset.advanceRound(roundWind(), partWind());
+    if(activeMatchTopology().seatCount() == 2 && partWind.isValid())
+    {
+        // A round deals once per active seat. Keep the ruleset's round limit,
+        // including Quick's East-only limit, without inventing empty hands.
+        if(partWind == Wind(Wind::East))
+        {
+            advance.partWindId = Wind::West;
+            advance.rotatePlayerWinds = true;
+        }
+        else
+            advance = ruleset.advanceRound(roundWind(), Wind::North);
+    }
+    if(advance.complete)
+        return false;
+
     pendingBattle = PendingBattle();
     do
     {
@@ -779,10 +912,6 @@ bool GameData::initMahjong(const RuneGameRuleset & ruleset)
     skipNewStone = false;
     skipNewTurn = false;
     stateGUI.clear();
-
-    const RuneGameRoundAdvance advance = ruleset.advanceRound(roundWind(), partWind());
-    if(advance.complete)
-        return false;
 
     if(advance.rotatePlayerWinds)
         gamers.shiftWinds();
@@ -807,7 +936,7 @@ bool GameData::initMahjong(const RuneGameRuleset & ruleset)
 void GameData::dumpOrderPersons(void)
 {
     DEBUG("players: ");
-    for(auto & id : winds_all)
+    for(auto & id : activeMatchTopology().winds())
     {
 	LocalPlayer & player = playerOfWind(id);
 
@@ -860,11 +989,16 @@ bool GameData::mahjong2Client(const Avatar & avatar, ActionList & actions)
 {
     LocalPlayer & current = playerOfWind(currentWind);
     const RuneGameRuleset & ruleset = activeRuneGameRuleset();
+    const auto rulesAt = [&](const Wind & wind) -> const WinRules & {
+        static const WinRules empty;
+        const LocalPlayer* player = gamers.playerOfWind(wind);
+        return player ? player->rules : empty;
+    };
     const auto runAutomatedTurn = [&](bool showGame, bool showKong)
     {
-	const WinRules & left = playerOfWind(prevWindCompass(currentWind)).rules;
-	const WinRules & right = playerOfWind(nextWindCompass(currentWind)).rules;
-	const WinRules & top = playerOfWind(oppositeWindCompass(currentWind)).rules;
+	const WinRules & left = rulesAt(prevWindCompass(currentWind));
+	const WinRules & right = rulesAt(nextWindCompass(currentWind));
+	const WinRules & top = rulesAt(oppositeWindCompass(currentWind));
 	return AI::mahjongTurn(currentWind, current.avatar, croupier.trash,
 	                       left, right, top, showGame, showKong, actions);
     };
@@ -874,9 +1008,9 @@ bool GameData::mahjong2Client(const Avatar & avatar, ActionList & actions)
 	if(GameData::usesAI(current))
 	{
 	    WinRules other;
-	    const WinRules & left = playerOfWind(prevWindCompass(currentWind)).rules;
-	    const WinRules & right = playerOfWind(nextWindCompass(currentWind)).rules;
-	    const WinRules & top = playerOfWind(oppositeWindCompass(currentWind)).rules;
+	    const WinRules & left = rulesAt(prevWindCompass(currentWind));
+	    const WinRules & right = rulesAt(nextWindCompass(currentWind));
+	    const WinRules & top = rulesAt(oppositeWindCompass(currentWind));
 	    other.reserve(left.size() + right.size() + top.size());
 	    other.insert(other.end(), left.begin(), left.end());
 	    other.insert(other.end(), right.begin(), right.end());
@@ -959,9 +1093,9 @@ bool GameData::mahjong2Client(const Avatar & avatar, ActionList & actions)
 	    }
 
 	    WinRules other;
-	    const WinRules & left = playerOfWind(prevWindCompass(currentWind)).rules;
-	    const WinRules & right = playerOfWind(nextWindCompass(currentWind)).rules;
-	    const WinRules & top = playerOfWind(oppositeWindCompass(currentWind)).rules;
+	    const WinRules & left = rulesAt(prevWindCompass(currentWind));
+	    const WinRules & right = rulesAt(nextWindCompass(currentWind));
+	    const WinRules & top = rulesAt(oppositeWindCompass(currentWind));
 	    other.reserve(left.size() + right.size() + top.size());
 	    other.insert(other.end(), left.begin(), left.end());
 	    other.insert(other.end(), right.begin(), right.end());
@@ -1002,7 +1136,7 @@ void GameData::validateMahjongSummary(void)
 {
     int total = 0;
 
-    for(auto & id : winds_all)
+    for(auto & id : activeMatchTopology().winds())
     {
 	const LocalPlayer & player = GameData::playerOfWind(id);
 

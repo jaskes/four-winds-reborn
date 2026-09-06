@@ -1590,6 +1590,10 @@ msgstr ""
 msgid "Classic"
 msgstr ""
 
+#: src/ui/settingsmenu.cpp
+msgid "Quick"
+msgstr ""
+
 #: src\settingsmenu.cpp:85
 msgid "Fast"
 msgstr ""
@@ -3230,6 +3234,30 @@ msgstr ""
 
 #: src/settingsmenu.cpp
 msgid "AI Difficulty"
+msgstr ""
+
+#: src/ui/settingsmenu.cpp
+msgid "Rune Game Rules"
+msgstr ""
+
+#: src/ui/settingsmenu.cpp
+msgid "Match Mode"
+msgstr ""
+
+#: src/ui/settingsmenu.cpp
+msgid "Free for All"
+msgstr ""
+
+#: src/ui/settingsmenu.cpp
+msgid "Duel"
+msgstr ""
+
+#: src/ui/settingsmenu.cpp
+msgid "Coalition"
+msgstr ""
+
+#: src/ui/gamesummarypart.cpp
+msgid "Team score: %1"
 msgstr ""
 
 #: src/settingsmenu.cpp

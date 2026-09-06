@@ -1590,6 +1590,10 @@ msgstr "Английский"
 msgid "Classic"
 msgstr "Классика"
 
+#: src/ui/settingsmenu.cpp
+msgid "Quick"
+msgstr "Быстрая"
+
 #: src\settingsmenu.cpp:85
 msgid "Fast"
 msgstr "Быстро"
@@ -3246,6 +3250,30 @@ msgstr "КЛИК / ENTER: ПОДРОБНЫЙ СЧЁТ"
 msgid "AI Difficulty"
 msgstr "Сложность ИИ"
 
+#: src/ui/settingsmenu.cpp
+msgid "Rune Game Rules"
+msgstr "Правила игры рун"
+
+#: src/ui/settingsmenu.cpp
+msgid "Match Mode"
+msgstr "Режим матча"
+
+#: src/ui/settingsmenu.cpp
+msgid "Free for All"
+msgstr "Каждый за себя"
+
+#: src/ui/settingsmenu.cpp
+msgid "Duel"
+msgstr "Дуэль"
+
+#: src/ui/settingsmenu.cpp
+msgid "Coalition"
+msgstr "Коалиция"
+
+#: src/ui/gamesummarypart.cpp
+msgid "Team score: %1"
+msgstr "Счёт команды: %1"
+
 #: src/settingsmenu.cpp
 msgid "AI DIFFICULTY"
 msgstr "СЛОЖНОСТЬ ИИ"
@@ -3491,3 +3519,91 @@ msgstr ""
 "Реплей разошёлся на действии %1.\n"
 "Ожидалось: %2\n"
 "Получено: %3"
+
+
+msgid "Ally"
+msgstr "Союзник"
+
+
+msgid "Classic: four rounds"
+msgstr "Классика: четыре раунда"
+
+
+msgid "Coalition: four players in two teams with a shared victory."
+msgstr "Коалиция: четыре игрока в двух командах с общей победой."
+
+
+msgid "Continue uses the saved match mode."
+msgstr "«Продолжить» использует режим из сохранения."
+
+
+msgid "Duel (two hands)"
+msgstr "Дуэль (две руки)"
+
+
+msgid "Duel: two players, one hand each, half the island each."
+msgstr "Дуэль: два игрока, по одной руке и половине острова."
+
+
+msgid "Eastern half"
+msgstr "Восточная половина"
+
+
+msgid "Final results"
+msgstr "Итоги матча"
+
+
+msgid "Four players. Two teams. Shared score and victory."
+msgstr "Четыре игрока. Две команды. Общий счёт и победа."
+
+
+msgid "Free for All: four independent players."
+msgstr "Классика: четыре независимых игрока."
+
+
+msgid "One rune hand"
+msgstr "Одна рука рун"
+
+
+msgid "Opponent"
+msgstr "Противник"
+
+
+msgid "Points"
+msgstr "Очки"
+
+
+msgid "Quick: East round"
+msgstr "Быстрая: восточный раунд"
+
+
+msgid "Rank: %1"
+msgstr "Место: %1"
+
+
+msgid "Spell Points: %1"
+msgstr "Очки заклинаний: %1"
+
+
+msgid "Team 1"
+msgstr "Команда 1"
+
+
+msgid "Team 2"
+msgstr "Команда 2"
+
+
+msgid "TEAM VICTORY"
+msgstr "ПОБЕДА КОМАНДЫ"
+
+
+msgid "Two players. One hand each. Half the island each."
+msgstr "Два игрока. По одной руке и половине острова."
+
+
+msgid "Western half"
+msgstr "Западная половина"
+
+
+msgid "You"
+msgstr "Вы"

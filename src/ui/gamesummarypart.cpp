@@ -29,6 +29,8 @@
 #include "gametheme.h"
 #include "gamesummarypart.h"
 #include "matchscore.h"
+#include "matchtopology.h"
+#include "matchpresentation.h"
 
 namespace
 {
@@ -147,14 +149,20 @@ GameSummaryScreen::GameSummaryScreen() : JsonWindow("screen_game_summary.json", 
     }
 
     summaryTitle = GameTheme::jsonTextInfo(jobject, "textinfo:summary_title");
-    summaryTitle.text = winners.size() > 1 ? _("JOINT VICTORY") : _("VICTORY");
+    summaryTitle.text = MatchPresentation::teams() && winners.size() == 2 ? _("TEAM VICTORY") :
+        (winners.size() > 1 ? _("JOINT VICTORY") : _("VICTORY"));
     summaryWinners = GameTheme::jsonTextInfo(jobject, "textinfo:summary_winners");
     summaryWinners.text = winnerNames();
     if(winners.size() > 2)
         summaryWinners.font = "dejavus20";
     summaryDetails = GameTheme::jsonTextInfo(jobject, "textinfo:summary_details");
     if(!winners.empty() && winners.front() < scores.size())
-        summaryDetails.text = StringFormat(_("Final score: %1")).arg(scores[winners.front()].totalScore);
+    {
+        const MatchScore::PlayerResult & winner = scores[winners.front()];
+        summaryDetails.text = activeMatchTopology().teamCount() < activeMatchTopology().seatCount() ?
+            StringFormat(_("Team score: %1")).arg(winner.teamScore) :
+            StringFormat(_("Final score: %1")).arg(winner.totalScore);
+    }
     summaryPortraitArea = GameTheme::jsonRect(jobject, "area:summary_portraits");
     summaryWinnerArea = GameTheme::jsonRect(jobject, "area:summary_winner");
 
@@ -238,9 +246,11 @@ void GameSummaryScreen::updateVictoryPage(void)
         buttons.setVisible(true);
         return;
     }
-    victoryTitle.text = winners.size() > 1 ? _("JOINT VICTORY") : _("VICTORY");
+    victoryTitle.text = summaryTitle.text;
     victoryName.text = winner.person.name();
-    victoryDetails.text = StringFormat(_("Final score: %1")).arg(winner.totalScore);
+    victoryDetails.text = activeMatchTopology().teamCount() < activeMatchTopology().seatCount() ?
+        StringFormat(_("Team score: %1")).arg(winner.teamScore) :
+        StringFormat(_("Final score: %1")).arg(winner.totalScore);
     victoryWinners.text = winners.size() > 1 ?
         StringFormat(_("Winners: %1")).arg(winnerNames()) : std::string();
     victoryHint.text = winnerPage + 1 < winners.size() ?
@@ -294,6 +304,56 @@ void GameSummaryScreen::renderWindow(void)
     }
 
     JsonWindow::renderWindow();
+
+    if(MatchPresentation::duel() || MatchPresentation::teams())
+    {
+        using namespace MatchPresentation;
+        card(*this, Rect(12, 12, 1000, 691), Color(107, 99, 70));
+        text(*this, modeName() + " / " + _("Final results"), Point(512, 30), 950, ink(), 26);
+        text(*this, summaryTitle.text + ": " + winnerNames(), Point(512, 78), 950);
+        const std::array<const char*, MatchScore::CategoryCount> categories = {
+            _("Territory Score"), _("Summon Circle Score"), _("Unit Score"), _("Spell Point Score"), _("Land Claim Score")
+        };
+        for(int team = 0; team < 2; ++team)
+        {
+            const int x = 30 + team * 488;
+            card(*this, Rect(x, 128, 476, 552), sideColor(team));
+            std::array<int, MatchScore::CategoryCount> raw{}, points{};
+            int total = 0, rank = 0, member = 0;
+            std::string title = teamName(team);
+            for(const auto & player : scores)
+            {
+                if(player.teamId != team) continue;
+                if(duel()) title = player.person.name() + " / " + role(player.person);
+                total = player.teamScore;
+                rank = player.teamRank;
+                const Texture portrait = Texture::scale(GameTheme::texture(GameData::avatarInfo(player.person.avatar).portrait), Size(72, 72), true);
+                const int portraitX = x + 26 + member++ * 220;
+                renderTexture(portrait, Point(portraitX, 188));
+                text(*this, player.person.name(), Point(portraitX + 80, 216), 104, ink(), 16, AlignLeft);
+                for(std::size_t category = 0; category < raw.size(); ++category)
+                {
+                    raw[category] += player.categories[category].score;
+                    points[category] += player.categories[category].standingPoints;
+                }
+            }
+            text(*this, title, Point(x + 238, 146), 450, sideColor(team), 22);
+            text(*this, StringFormat(_("Rank: %1")).arg(rank), Point(x + 238, 276), 440, sideColor(team), 22);
+            text(*this, _("Score"), Point(x + 341, 325), 82, ink(), 16);
+            text(*this, _("Points"), Point(x + 423, 325), 82, ink(), 16);
+            for(std::size_t category = 0; category < raw.size(); ++category)
+            {
+                const int y = 360 + 42 * static_cast<int>(category);
+                text(*this, categories[category], Point(x + 16, y), 280, ink(), 18, AlignLeft);
+                text(*this, String::number(raw[category]), Point(x + 341, y), 82);
+                text(*this, String::number(points[category]), Point(x + 423, y), 82);
+            }
+            renderLine(sideColor(team), Point(x + 16, 580), Point(x + 460, 580));
+            text(*this, StringFormat(teams() ? _("Team score: %1") : _("Final score: %1")).arg(total),
+                 Point(x + 238, 609), 440, sideColor(team), 26);
+        }
+        return;
+    }
 
     if(!winners.empty())
     {

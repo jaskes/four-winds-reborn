@@ -18,7 +18,9 @@
 #include "battlesession.h"
 #include "crashreport.h"
 #include "gamedata.h"
+#include "matchtopology.h"
 #include "recovery.h"
+#include "runegameruleset.h"
 
 namespace GameData
 {
@@ -121,9 +123,20 @@ bool prepareDeveloperNearEndFixture(const Avatar & avatar, bool adventure,
     if(human == GameData::gamers.end())
         return fail("developer near-end fixture could not find the human player");
 
+    Wind finalRound;
+    for(const auto round : winds_all)
+    {
+        if(activeRuneGameRuleset().advanceRound(round, Wind::North).complete)
+        {
+            finalRound = Wind(round);
+            break;
+        }
+    }
+    if(!finalRound.isValid()) return fail("ruleset has no supported final round");
+    const auto & seats = activeMatchTopology().winds();
     human->setAI(false);
-    GameData::roundWind = Wind(Wind::North);
-    GameData::partWind = Wind(adventure ? Wind::North : Wind::West);
+    GameData::roundWind = finalRound;
+    GameData::partWind = Wind(seats[seats.size() - (adventure ? 1 : 2)]);
 
     const bool initialized = adventure ? GameData::initAdventure() : GameData::initMahjong();
     if(!initialized)

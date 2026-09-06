@@ -830,6 +830,17 @@ bool BattleArmy::canMoveCreature(const BattleCreature & bcr, const Land & fromLa
 
     const Land & toLand = path.back();
 
+    // Allied territory is safe to cross, but the classic combat model stores
+    // one defending army per owner. Do not create co-located allied garrisons
+    // until multi-army battles are introduced explicitly.
+    if(!toLand.isTowerWinds())
+    {
+        const Clan destinationOwner = GameData::landInfo(toLand).clan;
+        if(destinationOwner.isValid() && destinationOwner != bcr.clan() &&
+           GameData::allied(destinationOwner, bcr.clan()))
+            return false;
+    }
+
     const bool gate = canGateParty(fromLand, toLand);
     const int movementCost = gate ? 1 : static_cast<int>(path.size());
 
@@ -853,7 +864,7 @@ bool BattleArmy::canMoveCreature(const BattleCreature & bcr, const Land & fromLa
 	    {
 		const LandInfo & land1 = GameData::landInfo(fromLand);
 		const LandInfo & land2 = GameData::landInfo(path[it]);
-		if(land1.clan != land2.clan) return false;
+		if(!GameData::allied(land1.clan, land2.clan)) return false;
 	    }
 	}
     }

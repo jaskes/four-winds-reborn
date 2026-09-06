@@ -1,6 +1,7 @@
 {
     "cursor":		"hardware",
     "background":	{ "id": "screen3", "type": "file", "file": "all.png", "crop": [0, 0, 1024, 768], "colorkey": "#ffd2d2" },
+    "duel:background": { "id": "screen3_duel", "type": "file", "file": "table-duel.png" },
     "default:font":	"dejavus18",
     "default:color":	"#efe4ae",
 
@@ -66,12 +67,25 @@
 
     "textinfo:fastlog": { "position": [ 512, 520 ], "align": "center", "font": "dejavus18", "color": "lime" },
 
+    "windcompass:size": [ 40, 48 ],
     "windcompass:sprites": {
-			    "east": [ "wind_blue_east", "wind_yellow_east" ],
-			    "south": [ "wind_blue_south", "wind_yellow_south" ],
-			    "west": [ "wind_blue_west", "wind_yellow_west" ],
-			    "north": [ "wind_blue_north", "wind_yellow_north" ]
-			},
+        "east": [
+            { "id": "table_wind_blue_east", "type": "file", "file": "wind-glyphs.png", "crop": [57, 155, 230, 419] },
+            { "id": "table_wind_yellow_east", "type": "file", "file": "wind-glyphs.png", "crop": [55, 682, 235, 430] }
+        ],
+        "south": [
+            { "id": "table_wind_blue_south", "type": "file", "file": "wind-glyphs.png", "crop": [377, 124, 201, 491] },
+            { "id": "table_wind_yellow_south", "type": "file", "file": "wind-glyphs.png", "crop": [377, 654, 203, 492] }
+        ],
+        "west": [
+            { "id": "table_wind_blue_west", "type": "file", "file": "wind-glyphs.png", "crop": [652, 243, 282, 318] },
+            { "id": "table_wind_yellow_west", "type": "file", "file": "wind-glyphs.png", "crop": [652, 772, 282, 321] }
+        ],
+        "north": [
+            { "id": "table_wind_blue_north", "type": "file", "file": "wind-glyphs.png", "crop": [996, 106, 209, 513] },
+            { "id": "table_wind_yellow_north", "type": "file", "file": "wind-glyphs.png", "crop": [994, 634, 217, 520] }
+        ]
+    },
 
     "windcompass:positions": {
 				"center": [ 192, 334 ],

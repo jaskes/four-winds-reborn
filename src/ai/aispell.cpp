@@ -36,7 +36,8 @@ namespace
     {
         PlayerView result;
         result.reserve(local.players.size());
-        for(const LocalPlayer & player : local.players) result.push_back(&player);
+        for(const LocalPlayer & player : local.players)
+            if(player.avatar.isValid()) result.push_back(&player);
         return result;
     }
 
@@ -208,7 +209,7 @@ namespace
         {
             if(border.isTowerWinds()) continue;
             const Clan & owner = GameData::landInfo(border).clan;
-            if(owner.isValid() && owner != clan) result++;
+            if(owner.isValid() && !GameData::allied(owner, clan)) result++;
         }
         return result;
     }
@@ -250,7 +251,7 @@ namespace
             int enemyPressure = 0;
             for(const LocalPlayer* other : players)
             {
-                if(!other || other->avatar == player.avatar || other->isAffectedSpell(info.id)) continue;
+                if(!other || GameData::allied(*other, player) || other->isAffectedSpell(info.id)) continue;
                 enemyPressure += 25 + other->points / 20 + (other->isCasted() ? 0 : 15);
             }
 
@@ -265,7 +266,7 @@ namespace
 
         for(const LocalPlayer* other : players)
         {
-            if(!other || other->avatar == player.avatar || other->isAffectedSpell(info.id)) continue;
+            if(!other || GameData::allied(*other, player) || other->isAffectedSpell(info.id)) continue;
 
             int score = 0;
             switch(info.id())
@@ -343,7 +344,7 @@ namespace
 
                 for(auto creature : party->toBattleCreatures())
                 {
-                    score += dispelValue(*creature, other->clan == player.clan);
+                    score += dispelValue(*creature, GameData::allied(other->clan, player.clan));
                     targets++;
                 }
             }
@@ -376,7 +377,7 @@ namespace
         for(const LocalPlayer* other : players)
         {
             if(!other) continue;
-            const bool friendly = other->clan == player.clan;
+            const bool friendly = GameData::allied(other->clan, player.clan);
             const bool allowedOwner = ((info.target() & SpellTarget::Friendly) && friendly) ||
                                       ((info.target() & SpellTarget::Enemy) && !friendly);
             if(!allowedOwner) continue;

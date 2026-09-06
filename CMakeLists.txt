@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.14)
 
-project(FourWindsReborn VERSION 0.4.0)
+project(FourWindsReborn VERSION 0.5.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
@@ -180,6 +180,7 @@ set(FOUR_WINDS_SOURCE
     src/rules/developerfixtures.cpp
     src/rules/gamestateio.cpp
     src/rules/gameplayrng.cpp
+    src/rules/matchtopology.cpp
     src/rules/matchscore.cpp
     src/rules/playerstate.cpp
     src/rules/replay.cpp
@@ -268,6 +269,8 @@ if(BUILD_TESTING AND NOT ANDROID)
     add_executable(gameplay_regression_tests
         tests/gameplay_regression_tests.cpp
         tests/avatar_balance_tests.cpp
+        tests/local_modes_ui_tests.cpp
+        tests/state_integrity_tests.cpp
         src/ai/tournament.cpp
         ${FOUR_WINDS_SOURCE})
     target_compile_definitions(gameplay_regression_tests PRIVATE
@@ -279,6 +282,18 @@ if(BUILD_TESTING AND NOT ANDROID)
         target_link_libraries(gameplay_regression_tests dbghelp comdlg32)
     endif()
     add_test(NAME gameplay_regressions COMMAND gameplay_regression_tests)
+    add_test(NAME local_modes_ui COMMAND gameplay_regression_tests --local-modes-ui-self-test)
+    add_test(NAME state_integrity COMMAND gameplay_regression_tests --state-integrity-self-test)
+    add_test(NAME match_mode_matrix COMMAND gameplay_regression_tests --match-mode-matrix-self-test)
+    set_tests_properties(match_mode_matrix PROPERTIES
+        TIMEOUT 240
+        ENVIRONMENT "FOUR_WINDS_RECOVERY_DIR=${CMAKE_BINARY_DIR}/match-mode-matrix/recovery;FOUR_WINDS_SAVE_DIR=${CMAKE_BINARY_DIR}/match-mode-matrix/saves")
+    set_tests_properties(state_integrity PROPERTIES
+        TIMEOUT 90
+        ENVIRONMENT "FOUR_WINDS_RECOVERY_DIR=${CMAKE_BINARY_DIR}/state-integrity/recovery;FOUR_WINDS_SAVE_DIR=${CMAKE_BINARY_DIR}/state-integrity/saves")
+    set_tests_properties(local_modes_ui PROPERTIES
+        TIMEOUT 90
+        ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy;SDL_RENDER_DRIVER=software;FOUR_WINDS_SETTINGS_FILE=${CMAKE_BINARY_DIR}/local-modes-ui/settings.json;FOUR_WINDS_RECOVERY_DIR=${CMAKE_BINARY_DIR}/local-modes-ui/recovery;FOUR_WINDS_SAVE_DIR=${CMAKE_BINARY_DIR}/local-modes-ui/saves")
     set_tests_properties(gameplay_regressions PROPERTIES
         ENVIRONMENT "FOUR_WINDS_RECOVERY_DIR=${CMAKE_BINARY_DIR}/recovery-test-gameplay;FOUR_WINDS_SAVE_DIR=${CMAKE_BINARY_DIR}/save-test-gameplay")
     add_test(NAME avatar_balance_metrics COMMAND gameplay_regression_tests --balance-only)

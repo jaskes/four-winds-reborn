@@ -18,14 +18,18 @@ with ready-to-run Windows, Linux and macOS x64 archives, a directly installable
 Android arm64 APK and SHA-256 checksums. On Windows, unpack the archive and
 launch `four-winds-reborn.exe`; on Android 6.0 or newer, install the APK.
 
+The local-mode milestone is frozen separately in source tag `v0.5.0`.
+Its GitHub Release and downloadable release packages have not been published;
+the latest published player packages remain `v0.4.0`.
+
 ## Roadmap
 
-- Improve Android ergonomics with larger touch targets and broader device
-  coverage after the initial native arm64 release.
-- Prove the shared ruleset contract with additional local Rune Game rules,
-  followed by separate Duel and Coalition modes.
-- Add authoritative multiplayer last, after Android and the local rulesets are
-  stable.
+- The v0.5.0 source milestone includes Quick Rune Game, two-player Duel,
+  four-controller Coalition and improved Android touch ergonomics.
+- Expand modular rulesets, mobile accessibility/device coverage and balance
+  evidence for the new local modes.
+- Add authoritative multiplayer last, after Android and all local rulesets are
+  stable, versioned and deterministic.
 
 ## Screenshots
 
@@ -61,6 +65,13 @@ launch `four-winds-reborn.exe`; on Android 6.0 or newer, install the APK.
   peaceful Training, honest Easy, Normal and Hard, and an openly unfair
   economy-boosted challenge. No level receives favorable RNG or access to
   hidden information.
+- Versioned match modes independent from the Rune Game rules: Classic free for
+  all, Duel (one hand and half the island per player) and fixed-team Coalition,
+  plus a Quick East-round ruleset. Settings affect new games; Continue keeps
+  the saved mode. Old four-hand Duel saves remain readable.
+- Native Android arm64 support with touch input, lifecycle-safe audio and
+  storage, installable APK releases and enlarged hit targets for small legacy
+  controls.
 - Manual tactical battles with legal target selection, AI recommendations and
   optional automatic resolution.
 - A bilingual Encyclopedia covering lore, factions, wizards, creatures, spells,

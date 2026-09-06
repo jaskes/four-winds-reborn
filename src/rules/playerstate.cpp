@@ -25,6 +25,7 @@
 
 #include "gameplayrng.h"
 #include "gamedata.h"
+#include "matchtopology.h"
 #include "runegameruleset.h"
 
 namespace GameData
@@ -85,6 +86,25 @@ std::string Person::name(void) const
 /* Persons */
 Persons::Persons(const Person & person)
 {
+    if(activeMatchTopology().seatCount() == 2)
+    {
+        // One wizard per island half; the wizard's selected clan owns both
+        // original clan territories on that half for the entire new match.
+        const int side = activeMatchTopology().teamForClan(person.clan());
+        const Clan otherClan(side == 0 ? Clan::Yellow : Clan::Red);
+        Avatars opponents = GameData::avatarsOfClan(otherClan);
+        opponents.erase(std::remove(opponents.begin(), opponents.end(), person.avatar), opponents.end());
+        GameplayRng::shuffle(opponents.begin(), opponents.end());
+        Person human = person;
+        human.wind = Wind(side == 0 ? Wind::East : Wind::West);
+        human.setAI(false);
+        Person opponent(opponents.front(), otherClan, Wind(side == 0 ? Wind::West : Wind::East));
+        opponent.setAI(true);
+        push_back(human);
+        push_back(opponent);
+        std::sort(begin(), end(), [](const Person & a, const Person & b) { return a.wind < b.wind; });
+        return;
+    }
     reserve(4);
     push_back(person);
 
@@ -113,7 +133,28 @@ Persons::Persons(const Person & person)
 	for(auto & pers : *this)
 	    pers.setAI(true);
 
-	GameplayRng::shuffle(begin(), end());
+	if(activeMatchTopology().id() == ClassicFreeForAllTopologyId)
+	    GameplayRng::shuffle(begin(), end());
+	else
+	{
+	    // Duel and Coalition use two readable island halves. Red/Purple are
+	    // assigned to East/South and Yellow/Aqua to West/North; order within
+	    // each pair remains random so winds do not become a clan alias.
+	    std::vector<Person> westHalf;
+	    std::vector<Person> eastHalf;
+	    for(const Person & pers : *this)
+	    {
+		if(pers.clan == Clan(Clan::Red) || pers.clan == Clan(Clan::Purple))
+		    westHalf.push_back(pers);
+		else
+		    eastHalf.push_back(pers);
+	    }
+	    GameplayRng::shuffle(westHalf.begin(), westHalf.end());
+	    GameplayRng::shuffle(eastHalf.begin(), eastHalf.end());
+	    clear();
+	    insert(end(), westHalf.begin(), westHalf.end());
+	    insert(end(), eastHalf.begin(), eastHalf.end());
+	}
 
 	at(0).wind = Wind(Wind::East);
 	at(1).wind = Wind(Wind::South);
@@ -411,7 +452,7 @@ bool LocalPlayer::isMahjongChao(const Wind & currentWind, const Stone & dropSton
     if(isSilenced())
         return false;
 
-    return ruleset.allowsChao(wind == currentWind.next(),
+    return ruleset.allowsChao(wind == Wind(activeMatchTopology().nextWind(currentWind())),
                               dropStone.isValid() && !dropStone.isSpecial(),
                               static_cast<int>(stones.findChaoVariants(dropStone).size()));
 }
@@ -783,7 +824,19 @@ LocalPlayer* LocalPlayers::playerOfClan(const Clan & clan)
     return it != end() ? & (*it) : nullptr;
 }
 
+const LocalPlayer* LocalPlayers::playerOfClan(const Clan & clan) const
+{
+    auto it = std::find_if(begin(), end(), [&](const LocalPlayer & lp){ return lp.isClan(clan); });
+    return it != end() ? & (*it) : nullptr;
+}
+
 LocalPlayer* LocalPlayers::playerOfWind(const Wind & wind)
+{
+    auto it = std::find_if(begin(), end(), [&](const LocalPlayer & lp){ return lp.isWind(wind); });
+    return it != end() ? & (*it) : nullptr;
+}
+
+const LocalPlayer* LocalPlayers::playerOfWind(const Wind & wind) const
 {
     auto it = std::find_if(begin(), end(), [&](const LocalPlayer & lp){ return lp.isWind(wind); });
     return it != end() ? & (*it) : nullptr;
@@ -795,10 +848,16 @@ LocalPlayer* LocalPlayers::playerOfAvatar(const Avatar & ava)
     return it != end() ? & (*it) : nullptr;
 }
 
+const LocalPlayer* LocalPlayers::playerOfAvatar(const Avatar & ava) const
+{
+    auto it = std::find_if(begin(), end(), [&](const LocalPlayer & lp){ return lp.isAvatar(ava); });
+    return it != end() ? & (*it) : nullptr;
+}
+
 void LocalPlayers::shiftWinds(void)
 {
     for(auto & lp : *this)
-	lp.shiftWind();
+        lp.wind = Wind(activeMatchTopology().nextWind(lp.wind()));
 }
 
 bool LocalPlayers::findKongs(void) const

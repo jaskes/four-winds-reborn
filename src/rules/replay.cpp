@@ -7,6 +7,7 @@
 #include "aiprofile.h"
 #include "contentpackage.h"
 #include "gamedata.h"
+#include "matchtopology.h"
 #include "recovery.h"
 #include "runegameruleset.h"
 
@@ -52,7 +53,8 @@ JsonObject stateWithoutArtifactIdentity(const JsonObject & state)
     JsonObject result;
     for(const std::string & key : state.keys())
     {
-        if(key == RuneGameRulesetIdentityKey || key == ContentPackageIdentityKey) continue;
+        if(key == RuneGameRulesetIdentityKey || key == MatchTopologyIdentityKey ||
+           key == ContentPackageIdentityKey) continue;
 
         const JsonValue* value = state.getValue(key);
         if(!value) continue;
@@ -76,7 +78,7 @@ JsonObject stateWithoutArtifactIdentity(const JsonObject & state)
 
 std::string replayStateHash(const JsonObject & state)
 {
-    // Ruleset and content-package identities are validated separately by
+    // Ruleset, match-topology and content-package identities are validated separately by
     // Replay::run. Keeping them outside the gameplay hash preserves existing
     // Classic replay hashes while rejecting incompatible artifacts up front.
     return Recovery::stateHash(stateWithoutArtifactIdentity(state));
@@ -462,6 +464,8 @@ JsonObject Replay::actionJournal(const JsonObject & checkpointState)
     result.addInteger("schema", forcedProfile ? 3 : (hasSystemOperations ? 2 : 1));
     result.addObject(RuneGameRulesetIdentityKey,
                      runeGameRulesetIdentityJson(activeRuneGameRuleset()));
+    result.addObject(MatchTopologyIdentityKey,
+                     matchTopologyIdentityJson(activeMatchTopology()));
     result.addObject(ContentPackageIdentityKey,
                      contentPackageIdentityJson(activeContentPackageManifest()));
     result.addString("aiBehaviorProfile", forcedProfile ?
@@ -516,6 +520,17 @@ bool Replay::inspectJournal(const JsonObject & journal, JournalInfo & info,
         return false;
     }
 
+    MatchTopologyIdentity journalTopology;
+    MatchTopologyIdentity stateTopology;
+    if(!resolveMatchTopologyIdentity(journal, journalTopology, true, error) ||
+       !resolveMatchTopologyIdentity(*initialState, stateTopology, true, error))
+        return false;
+    if(!sameMatchTopology(journalTopology, stateTopology))
+    {
+        if(error) *error = "journal and initial state use different match topologies";
+        return false;
+    }
+
     ContentPackageIdentity journalPackage;
     ContentPackageIdentity statePackage;
     if(!resolveContentPackageIdentity(journal, journalPackage, true, error) ||
@@ -560,6 +575,8 @@ bool Replay::inspectJournal(const JsonObject & journal, JournalInfo & info,
                                         initialState->getString("ai:difficulty"));
     info.rulesetId = journalRuleset.id;
     info.rulesetVersion = journalRuleset.version;
+    info.topologyId = journalTopology.id;
+    info.topologyVersion = journalTopology.version;
     info.contentPackageId = journalPackage.id;
     info.contentPackageVersion = journalPackage.version;
     info.contiguousToCheckpoint = journal.getBoolean("contiguousToCheckpoint");

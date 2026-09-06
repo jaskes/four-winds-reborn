@@ -11,7 +11,10 @@
 #include <vector>
 
 #include "settings.h"
+#include "battlesession.h"
 #include "contentpackage.h"
+#include "gameplayrng.h"
+#include "matchtopology.h"
 #include "runegameruleset.h"
 #include "swe/swe_systems.h"
 
@@ -170,8 +173,61 @@ bool Recovery::validateSaveState(const SWE::JsonObject & state, std::string* err
     RuneGameRulesetIdentity ruleset;
     if(!resolveRuneGameRulesetIdentity(state, ruleset, true, error)) return false;
 
+    MatchTopologyIdentity topology;
+    if(!resolveMatchTopologyIdentity(state, topology, true, error)) return false;
+
     ContentPackageIdentity package;
     if(!resolveContentPackageIdentity(state, package, true, error)) return false;
+
+    // Share the loader's structural checks with save inspection and replacement.
+    // No live state (including RNG or island ownership) is changed here.
+    for(const char* key : {"croupier", "winresult"})
+    {
+        if(!state.isObject(key))
+        {
+            if(error) *error = std::string("save is missing object: ") + key;
+            return false;
+        }
+    }
+    const auto* history = state.getArray("history");
+    if(!history)
+    {
+        if(error) *error = "save is missing battle history";
+        return false;
+    }
+    for(std::size_t index = 0; index < history->size(); ++index)
+    {
+        if(!history->getObject(index))
+        {
+            if(error) *error = "save battle history entry is invalid";
+            return false;
+        }
+    }
+    for(const char* key : {"gameplayRng", "landOwners", "battleSession", "gui"})
+    {
+        if(state.hasKey(key) && !state.isObject(key))
+        {
+            if(error) *error = std::string("save object has an invalid type: ") + key;
+            return false;
+        }
+    }
+    if(const auto* rng = state.getObject("gameplayRng"))
+    {
+        if(!GameplayRng::isValidState(*rng))
+        {
+            if(error) *error = "unsupported or invalid gameplay RNG state";
+            return false;
+        }
+    }
+    if(const auto* battle = state.getObject("battleSession"))
+    {
+        const auto decoded = GameData::PendingBattle::fromJsonObject(*battle);
+        if(!decoded.isValid() || decoded.session.phase() == Battle::Session::Phase::None)
+        {
+            if(error) *error = "invalid pending battle session";
+            return false;
+        }
+    }
 
     const SWE::JsonObject* myPerson = state.getObject("myperson");
     const SWE::JsonArray* players = state.getArray("players");
@@ -180,16 +236,16 @@ bool Recovery::validateSaveState(const SWE::JsonObject & state, std::string* err
         if(error) *error = "save does not identify the local player";
         return false;
     }
-    if(!players || players->size() != 4)
+    const MatchTopology & match = *findMatchTopology(topology.id, topology.version);
+    if(!players || players->size() != match.seatCount())
     {
-        if(error) *error = "save does not contain four players";
+        if(error) *error = "save player count does not match its topology";
         return false;
     }
 
     const std::string myAvatar = myPerson->getString("avatar");
-    const std::string myClan = myPerson->getString("clan");
-    if(myAvatar.empty() || myAvatar == "none" || myAvatar == "random" ||
-       myClan.empty() || myClan == "none")
+    const std::string myClan = Clan(myPerson->getString("clan")).toString();
+    if(!Avatar(myAvatar).isValid() || myAvatar == "random" || !Clan(myClan).isValid())
     {
         if(error) *error = "local player identity is invalid";
         return false;
@@ -209,10 +265,10 @@ bool Recovery::validateSaveState(const SWE::JsonObject & state, std::string* err
         }
 
         const std::string avatar = player->getString("avatar");
-        const std::string clan = player->getString("clan");
+        const std::string clan = Clan(player->getString("clan")).toString();
         const std::string wind = player->getString("wind");
-        if(avatar.empty() || avatar == "none" || avatar == "random" ||
-           clan.empty() || clan == "none" || wind.empty() || wind == "none")
+        if(!Avatar(avatar).isValid() || avatar == "random" ||
+           !Clan(clan).isValid() || !match.hasWind(Wind(wind)()))
         {
             if(error) *error = "save player identity is invalid";
             return false;
@@ -226,6 +282,59 @@ bool Recovery::validateSaveState(const SWE::JsonObject & state, std::string* err
 
         if(avatar == myAvatar && clan == myClan)
             localPlayerFound = true;
+    }
+
+    if(const auto* owners = state.getObject("landOwners"))
+    {
+        for(const auto landId : lands_all)
+        {
+            const Land land(landId);
+            if(!land.isTowerWinds() && owners->hasKey(land.toString()) &&
+               !clans.count(Clan(owners->getString(land.toString())).toString()))
+            {
+                if(error) *error = "territory has an invalid owner";
+                return false;
+            }
+        }
+    }
+
+    if(match.seatCount() == 2)
+    {
+        const Clan first(players->getObject(0)->getString("clan"));
+        const Clan second(players->getObject(1)->getString("clan"));
+        if(!first.isValid() || !second.isValid() || match.alliedByClan(first(), second()))
+        {
+            if(error) *error = "Duel save must contain opposite island halves";
+            return false;
+        }
+        const auto* owners = state.getObject("landOwners");
+        if(!owners)
+        {
+            if(error) *error = "Duel save is missing its island ownership";
+            return false;
+        }
+        for(const auto landId : lands_all)
+        {
+            const Land land(landId);
+            if(!land.isTowerWinds())
+            {
+                const std::string owner = Clan(owners->getString(land.toString())).toString();
+                if(!clans.count(owner))
+                {
+                    if(error) *error = "Duel territory has no participating owner";
+                    return false;
+                }
+            }
+        }
+        for(const char* key : {"wind:current", "wind:part"})
+        {
+            const Wind wind(state.getString(key));
+            if((state.getInteger("gamepart") != 0 || wind.isValid()) && !match.hasWind(wind()))
+            {
+                if(error) *error = "Duel save refers to an inactive seat";
+                return false;
+            }
+        }
     }
 
     if(!localPlayerFound)
@@ -323,6 +432,17 @@ Recovery::CheckpointInfo Recovery::inspectCheckpoint(const std::string & directo
     if(!sameRuneGameRuleset(stateRuleset, metadataRuleset))
     {
         info.error = "save and recovery metadata use different Rune Game rulesets";
+        return info;
+    }
+
+    MatchTopologyIdentity stateTopology;
+    MatchTopologyIdentity metadataTopology;
+    if(!resolveMatchTopologyIdentity(state, stateTopology, true, &info.error) ||
+       !resolveMatchTopologyIdentity(metadata, metadataTopology, true, &info.error))
+        return info;
+    if(!sameMatchTopology(stateTopology, metadataTopology))
+    {
+        info.error = "save and recovery metadata use different match topologies";
         return info;
     }
 

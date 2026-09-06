@@ -16,6 +16,11 @@ std::uint64_t generatorDraws = 0;
 
 std::uint64_t parseUnsigned(const std::string & value, bool* valid)
 {
+    if(value.empty() || value.find_first_not_of("0123456789") != std::string::npos)
+    {
+        if(valid) *valid = false;
+        return 0;
+    }
     try
     {
         std::size_t parsed = 0;
@@ -118,9 +123,18 @@ SWE::JsonObject GameplayRng::toJsonObject(void)
     return result;
 }
 
-bool GameplayRng::fromJsonObject(const SWE::JsonObject & value)
+namespace
 {
-    if(value.getString("algorithm") != Algorithm) return false;
+struct RngState
+{
+    std::uint64_t seed = 0;
+    std::uint64_t state = 0;
+    std::uint64_t draws = 0;
+};
+
+bool decodeState(const SWE::JsonObject & value, RngState & result)
+{
+    if(value.getString("algorithm") != GameplayRng::Algorithm) return false;
 
     bool stateValid = false;
     bool drawsValid = false;
@@ -133,8 +147,23 @@ bool GameplayRng::fromJsonObject(const SWE::JsonObject & value)
     if(encodedSeed.empty()) seedValid = stateValid;
     if(!stateValid || !drawsValid || !seedValid || !restoredState || !restoredSeed) return false;
 
-    generatorSeed = restoredSeed;
-    generatorState = restoredState;
-    generatorDraws = restoredDraws;
+    result = {restoredSeed, restoredState, restoredDraws};
+    return true;
+}
+}
+
+bool GameplayRng::isValidState(const SWE::JsonObject & value)
+{
+    RngState decoded;
+    return decodeState(value, decoded);
+}
+
+bool GameplayRng::fromJsonObject(const SWE::JsonObject & value)
+{
+    RngState decoded;
+    if(!decodeState(value, decoded)) return false;
+    generatorSeed = decoded.seed;
+    generatorState = decoded.state;
+    generatorDraws = decoded.draws;
     return true;
 }
