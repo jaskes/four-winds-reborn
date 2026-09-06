@@ -36,6 +36,19 @@
 
 namespace
 {
+// Reduce transparent artwork in stages; SDL2 Texture::scale ignores its
+// smoothing argument and a single large reduction loses the fine wind strokes.
+Texture fitTableArtwork(const Texture & texture, const Size & bounds)
+{
+    if(!texture.isValid() || bounds.isEmpty()) return texture;
+    const double ratio = std::min(double(bounds.w) / texture.width(), double(bounds.h) / texture.height());
+    const Size target(std::max(1, int(texture.width() * ratio)), std::max(1, int(texture.height() * ratio)));
+    Surface surface = Display::createSurface(texture);
+    while(surface.width() > target.w * 2 && surface.height() > target.h * 2)
+        surface = Surface::scale(surface, Size(surface.width() / 2, surface.height() / 2), true);
+    return Display::createTexture(Surface::scale(surface, target, true));
+}
+
 class ScopedTickPause
 {
     Window & window;
@@ -75,6 +88,15 @@ OrderTurn::OrderTurn(const JsonObject & jobject)
 	windsMarker[1] = WindMarker(GameTheme::jsonSprites(*jo, "south"));
 	windsMarker[2] = WindMarker(GameTheme::jsonSprites(*jo, "west"));
 	windsMarker[3] = WindMarker(GameTheme::jsonSprites(*jo, "north"));
+        if(jobject.hasKey("windcompass:size"))
+        {
+            const Size bounds = GameTheme::jsonSize(jobject, "windcompass:size");
+            for(auto & marker : windsMarker)
+            {
+                marker.first = fitTableArtwork(marker.first, bounds);
+                marker.second = fitTableArtwork(marker.second, bounds);
+            }
+        }
     }
 
     windPositions = GameTheme::jsonSidesPositions(jobject, "windcompass:positions");
@@ -97,12 +119,19 @@ void OrderTurn::render(Window & win, const Wind & localWind, const Wind & curren
     const WindCompass winds(localWind);
 
     renderCentered(win, windPositions.center, windsMarker[partWind() - 1]);
+    // In Duel the two seat winds belong to the opposing name plaques.
+    if(MatchPresentation::duel()) return;
     if(activeMatchTopology().hasWind(winds.left()()))
         renderCentered(win, windPositions.left, createMarker(winds.left(), winds.left() == currentWind));
     if(activeMatchTopology().hasWind(winds.right()()))
         renderCentered(win, windPositions.right, createMarker(winds.right(), winds.right() == currentWind));
     renderCentered(win, windPositions.top, createMarker(winds.top(), winds.top() == currentWind));
     renderCentered(win, windPositions.bottom, createMarker(winds.bottom(), winds.bottom() == currentWind));
+}
+
+void OrderTurn::renderSeat(Window & win, const Point & center, const Wind & wind, bool active) const
+{
+    if(wind.isValid()) renderCentered(win, center, createMarker(wind, active));
 }
 
 Rect TurnAnimation::maxArea(void) const
@@ -190,6 +219,28 @@ MahjongPartScreen::MahjongPartScreen() : JsonWindow("screen_mahjongpart.json", n
     namesPos = GameTheme::jsonSidesPositions(jobject, "names:positions");
     fastLogText = GameTheme::jsonTextInfo(jobject, "textinfo:fastlog");
     fastLogNormalColor = fastLogText.color;
+
+    if(MatchPresentation::duel())
+    {
+        if(jobject.hasKey("duel:background") && !sprites.empty())
+        {
+            const Sprite background = GameTheme::jsonSprite(jobject, "duel:background");
+            if(background.isValid()) sprites.front().setTexture(fitTableArtwork(background, size()));
+        }
+        namesPos.top = Point(512, 141);
+        namesPos.bottom = Point(512, 535);
+        croupierPos = Point(296, 190);
+        dropStonePos = Point(832, 475);
+        fastLogText.position = Point(512, 577);
+        // Keep claims beside the current discard, clear of the discard history.
+        const std::pair<const char*, Point> claims[] = {
+            {"but_chow", Point(736, 535)}, {"but_pung", Point(816, 535)},
+            {"but_kong", Point(896, 535)}, {"but_game", Point(776, 579)},
+            {"but_pass", Point(856, 579)}
+        };
+        for(const auto & claim : claims)
+            if(JsonButton* button = buttons.findIds(claim.first)) button->setPosition(claim.second);
+    }
 
     buttonPass = buttons.findIds("but_pass");
     buttonChao = buttons.findIds("but_chow");
@@ -338,22 +389,12 @@ void MahjongPartScreen::renderWindow(void)
 
     if(MatchPresentation::duel())
     {
-        // Two opposing seats; the four printed clan emblems belong to the
-        // original table and must not imply two additional participants.
         using namespace MatchPresentation;
-        card(*this, Rect(94, 4, 836, 654), Color(107, 99, 70));
-        card(*this, Rect(282, 106, 456, 452), Color(70, 82, 81));
-        renderLine(Color(70, 82, 81), Point(300, 548), Point(720, 548));
-        for(const auto & seat : {ld.remoteTop(), ld.remoteBottom()})
-        {
-            const int y = seat.avatar == ld.myPlayer().avatar ? 563 : 57;
-            renderColor(sideColor(side(seat)), Rect(300, y, 424, 2));
-        }
-        text(*this, modeName(), Point(180, 156), 150, ink(), 26);
-        int labelY = 198;
+        text(*this, modeName(), Point(192, 176), 166, ink(), 26);
+        int labelY = 214;
         for(const std::string & line : GameTheme::fontRender("dejavus14").splitStringWidth(rulesName(), 166))
         {
-            text(*this, line, Point(180, labelY), 166, ink(), 14);
+            text(*this, line, Point(192, labelY), 166, ink(), 14);
             labelY += 18;
         }
     }
@@ -533,7 +574,7 @@ bool MahjongPartScreen::fromJsonObject(const JsonObject & jo)
 	variantSelected = jo.getInteger("variantSelected");
 	playersMarker = jo.getInteger("playersMarker");
 	fastLogText.text = jo.getString("fastLogText");
-	fastLogOwner = Wind(jo.getString("wind", "none"));
+	fastLogOwner = Wind(jo.getString("fastLogOwner", "none"));
 
 	if(buttonPass) buttonPass->setJsonInfo(jo.getObject("buttonPass"));
 	if(buttonChao) buttonChao->setJsonInfo(jo.getObject("buttonChao"));
@@ -733,6 +774,11 @@ std::string MahjongPartScreen::playerPrettyName(const RemotePlayer & player) con
 void MahjongPartScreen::renderNamesHorizontal(const RemotePlayer & player, const Point & center)
 {
     if(!player.avatar.isValid()) return;
+    if(MatchPresentation::duel())
+    {
+        renderDuelName(player, center);
+        return;
+    }
     Color color = fastLogText.text.size() && fastLogOwner == player.wind ? fastLogText.color :
         (MatchPresentation::teams() ? MatchPresentation::sideColor(MatchPresentation::side(player)) : defaultColor);
     std::string name = playerPrettyName(player);
@@ -742,6 +788,20 @@ void MahjongPartScreen::renderNamesHorizontal(const RemotePlayer & player, const
     Texture flag = GameTheme::texture(GameData::clanInfo(player.clan).flag1);
     renderTexture(flag, Point(pos.x - flag.width() - 5, pos.y + (pos.h - flag.height()) / 2));
     renderTexture(flag, Point(pos.x + pos.w + 5, pos.y + (pos.h - flag.height()) / 2));
+}
+
+void MahjongPartScreen::renderDuelName(const RemotePlayer & player, const Point & center)
+{
+    using namespace MatchPresentation;
+    const bool active = player.wind == ld.currentWind;
+    const Color color = active ? ink() : Color(198, 196, 174);
+    if(!jobject.hasKey("duel:background"))
+        card(*this, Rect(center.x - 222, center.y - 28, 444, 56), Color(107, 99, 70));
+    text(*this, String::ucFirst(player.name()), center + Point(0, -22), 310, color, 26);
+    text(*this, role(player), center + Point(0, 9), 310, Color(169, 184, 178), 14);
+    const Texture flag = GameTheme::texture(GameData::clanInfo(player.clan).flag1);
+    renderTexture(flag, center + Point(-182 - flag.width() / 2, -flag.height() / 2));
+    orderTurn.renderSeat(*this, center + Point(182, 0), player.wind, active);
 }
 
 void MahjongPartScreen::renderNamesVertical(const RemotePlayer & player, const Point & center)
@@ -859,7 +919,7 @@ void MahjongPartScreen::renderScryRunes(void)
 	    if(pos.isNull())
 	    {
 		pos.x = namesPos.top.x - (ld.remoteTop().stones.size() * tx.width()) / 2;
-		pos.y = namesPos.top.y - tx.height() / 2;
+		pos.y = MatchPresentation::duel() ? 72 : namesPos.top.y - tx.height() / 2;
 	    }
 
 	    renderTexture(tx, pos);
@@ -934,15 +994,22 @@ void MahjongPartScreen::renderCroupier(void)
 {
     Point pos = croupierPos;
     const VecStones & trash = ld.trashSet;
+    // Two hands leave more stones to draw. Use the small atlas only when the
+    // history exceeds six medium rows, so every discard stays on the table.
+    const bool duel = MatchPresentation::duel();
+    const bool compact = duel && trash.size() > 60;
+    const int columns = duel ? (compact ? 18 : 10) : 9;
+    const int startX = croupierPos.x + (duel && !compact ? 16 : 0);
+    pos.x = startX;
 
     for(int index = 0; index < trash.size(); ++index)
     {
 	const StoneInfo & info = GameData::stoneInfo(trash[index]);
-	const Texture & sprite = GameTheme::texture(info.medium);
+	const Texture & sprite = GameTheme::texture(compact ? info.small : info.medium);
 
-	if(index && 0 == (index % 9))
+	if(index && 0 == (index % columns))
 	{
-	    pos.x = croupierPos.x;
+	    pos.x = startX;
 	    pos.y += sprite.height();
 	}
 

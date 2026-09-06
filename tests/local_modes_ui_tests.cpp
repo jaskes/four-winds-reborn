@@ -31,6 +31,7 @@ namespace GameData
     extern WinResults winResult;
     extern Wind roundWind;
     extern Wind partWind;
+    extern CroupierSet croupier;
 }
 
 namespace
@@ -88,7 +89,8 @@ int runLocalModesUiTests(const char*)
     {
         Settings::setLanguage(language);
         Translation::setStripContext('|');
-        check(Translation::bindDomain(Application::domain(), GameTheme::readResource(std::string(language) + ".mo")), "load test language");
+        if(std::string(language) != "en")
+            check(Translation::bindDomain(Application::domain(), GameTheme::readResource(std::string(language) + ".mo")), "load test language");
         Translation::setLanguage(language);
         Translation::setDomain(Application::domain());
         GameData::retranslateThemeData();
@@ -220,9 +222,49 @@ int runLocalModesUiTests(const char*)
     {
         RuneScreen screen;
         snapshot("duel-table.png");
+        JsonObject savedUi = screen.toJsonObject();
+        savedUi.addString("fastLogText", "Restored action");
+        savedUi.addString("fastLogOwner", "west");
+        check(screen.fromJsonObject(savedUi) && screen.toJsonObject().getString("fastLogOwner") == "west",
+              "Continue preserves the owner of the visible action log");
         const LocalData data = GameData::toLocalData(GameData::myPerson().avatar);
         MapStatusDialog status(data, screen);
         snapshot("duel-status.png");
+    }
+    if(std::getenv("FOUR_WINDS_UI_SNAPSHOT_DIR"))
+    {
+        // Rendering stress fixtures, isolated from the match used below.
+        const JsonObject savedMatch = GameData::authoritativeState();
+        GameData::currentWind = Wind::West;
+        GameData::dropStone = Stone::Number7;
+        for(LocalPlayer & player : GameData::gamers)
+            player.rules.emplace_back(WinRule::Pung, Stone::Sword1, false);
+        GameData::gamers.playerOfWind(Wind::West)->affected.insert(
+            AffectedSpell(Spell::ScryRunes, 2, GameData::myPerson().avatar));
+        const VecStones wall = GameData::croupier.bank;
+        for(int count : {24, 60, 61, 136})
+        {
+            if(count == 136)
+                for(LocalPlayer & player : GameData::gamers)
+                {
+                    player.rules.clear();
+                    for(int i = 0; i < 4; ++i)
+                        player.rules.emplace_back(WinRule::Kong, Stone::Sword1, false);
+                }
+            GameData::croupier.trash.clear();
+            for(int i = 0; i < count; ++i) GameData::croupier.trash.push_back(wall[i % wall.size()]);
+            RuneScreen screen;
+            JsonObject ui = screen.toJsonObject();
+            ui.addInteger("stoneSelected", -1);
+            ui.addInteger("variantSelected", -1);
+            JsonObject visible;
+            visible.addBoolean("visible", true);
+            for(const char* id : {"buttonPass", "buttonChao", "buttonPung", "buttonKong", "buttonGame"})
+                ui.addObject(id, visible);
+            screen.fromJsonObject(ui);
+            snapshot(("duel-table-discard-" + std::to_string(count) + ".png").c_str());
+        }
+        check(GameData::restoreState(savedMatch), "restore match after table snapshots");
     }
     GameData::winResult = WinResults::drawn(GameData::currentWind, GameData::roundWind);
     {
