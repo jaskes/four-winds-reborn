@@ -255,7 +255,7 @@ int runMultiplayerUiTests(const char*)
     check(peer.connection.connect("127.0.0.1", match.port(), error), "connect real socket peer: " + error);
     JsonObject hello;
     hello.addString("kind", "hello");
-    hello.addInteger("protocol", 1);
+    hello.addInteger("protocol", 2);
     hello.addInteger("rulesContract", 1);
     const auto identity = contentPackageIdentity(activeContentPackageManifest());
     hello.addString("content", identity.id);

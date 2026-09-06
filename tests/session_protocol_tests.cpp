@@ -91,7 +91,7 @@ namespace
         require(remote.connect("localhost", host.port(), error), error);
         eventually([&] { host.poll(); remote.poll(); return remote.connected(); }, "host transport connection");
         auto hello = packet("hello");
-        hello.addInteger("protocol", 1);
+        hello.addInteger("protocol", 2);
         hello.addInteger("rulesContract", 1);
         const auto identity = contentPackageIdentity(activeContentPackageManifest());
         hello.addString("content", identity.id);
@@ -300,6 +300,7 @@ namespace
         JsonObject view;
         std::vector<JsonObject> received;
         std::string error;
+        std::uint64_t stateSequence = 0;
 
         FakeHost()
         {
@@ -320,13 +321,7 @@ namespace
                 if(connection) read(*connection, received);
                 return hasKind(received, "hello");
             }, "client hello timeout");
-            auto welcome = packet("welcome");
-            welcome.addString("token", std::string(64, 'a'));
-            welcome.addString("avatar", Avatar(Avatar::Lakkho).toString());
-            welcome.addInteger("required", 2);
-            welcome.addString("mode", "duel");
-            welcome.addString("ruleset", "quick");
-            send(*connection, welcome);
+            welcome();
             state(10, false);
             ActionList events;
             eventually([&] { poll(); client.takeEvents(events); events.clear(); return client.started(); }, "client initial view timeout");
@@ -335,11 +330,23 @@ namespace
             require(client.localAvatar() == Avatar(Avatar::Lakkho), "client assigned seat mismatch");
         }
 
+        void welcome()
+        {
+            auto welcome = packet("welcome");
+            welcome.addString("token", std::string(64, 'a'));
+            welcome.addString("avatar", Avatar(Avatar::Lakkho).toString());
+            welcome.addInteger("required", 2);
+            welcome.addString("mode", "duel");
+            welcome.addString("ruleset", "quick");
+            send(*connection, welcome);
+        }
+
         void poll() { client.poll(); read(*connection, received); }
         void state(std::uint64_t revision, bool resume, const ActionList& events = ActionList())
         {
             auto message = packet("state");
             message.addString("revision", std::to_string(revision));
+            message.addString("sequence", std::to_string(stateSequence));
             message.addInteger("phase", view.getInteger("phase"));
             message.addObject("view", view);
             JsonArray serialized;
@@ -348,13 +355,28 @@ namespace
             message.addBoolean("resume", resume);
             send(*connection, message);
         }
-        void ack(std::uint64_t sequence, bool accepted)
+        void ack(std::uint64_t sequence, bool accepted, std::uint64_t revision, bool stateRequired = true)
         {
+            stateSequence = sequence;
             auto message = packet("ack");
             message.addString("sequence", std::to_string(sequence));
             message.addBoolean("accepted", accepted);
+            message.addString("revision", std::to_string(revision));
+            message.addBoolean("state", stateRequired);
             message.addInteger("reason", 0);
             send(*connection, message);
+        }
+
+        void deliveryFence()
+        {
+            const auto replies = countKind(received, "pong");
+            send(*connection, packet("ping"));
+            eventually([&] { poll(); return countKind(received, "pong") > replies; },
+                       "client did not process the packet-delivery fence");
+            // Flush anything queued after the pong in the same client poll.
+            const auto until = Clock::now() + std::chrono::milliseconds(20);
+            do { poll(); std::this_thread::sleep_for(std::chrono::milliseconds(1)); }
+            while(Clock::now() < until);
         }
     };
 
@@ -369,11 +391,18 @@ namespace
         eventually([&] { fake.poll(); return countKind(fake.received, "command") == 1; }, "first client intent not dispatched");
         for(int i = 0; i < 8; ++i) fake.poll();
         require(countKind(fake.received, "command") == 1, "client sent a second unacknowledged command");
-        fake.ack(1, true);
-        fake.state(11, false);
+        fake.ack(1, true, 11);
+        fake.deliveryFence();
+        require(countKind(fake.received, "command") == 1,
+                "second command dispatched after acknowledgement but before its resulting state arrived");
+        ActionList presentation;
+        presentation.push_back(MahjongInfo(Wind::West, "pending command presentation"));
+        fake.state(11, false, presentation);
         eventually([&] { fake.poll(); fake.client.takeEvents(events); return fake.client.revision() == 11; }, "next state not applied");
-        for(int i = 0; i < 8; ++i) fake.poll();
+        require(events.size() == 1, "resulting state did not deliver its presentation event");
+        for(int i = 0; i < 8; ++i) { fake.client.takeEvents(events); fake.poll(); }
         require(countKind(fake.received, "command") == 1, "second command bypassed state-consumed callback");
+        events.clear();
         fake.client.takeEvents(events);
         eventually([&] { fake.poll(); return countKind(fake.received, "command") == 2; }, "second queued command was lost");
         std::vector<JsonObject> commands;
@@ -383,7 +412,7 @@ namespace
                 "queued command revision was captured too early");
         require(commands[0].getObject("action")->getInteger("unit") == 101 &&
                 commands[1].getObject("action")->getInteger("unit") == 102, "movement FIFO order changed");
-        fake.ack(2, false);
+        fake.ack(2, false, 11);
         fake.state(11, true);
         for(int i = 0; i < 20; ++i)
         { fake.poll(); fake.client.takeEvents(events); events.clear(); }
@@ -394,6 +423,92 @@ namespace
         eventually([&] { fake.poll(); fake.client.takeEvents(events); return fake.client.revision() == 12; }, "changed-turn view not applied");
         for(int i = 0; i < 8; ++i) { fake.client.takeEvents(events); fake.poll(); }
         require(countKind(fake.received, "command") == 2, "queued movement crossed into a different turn");
+    }
+
+    void testNoOpAckDoesNotRequireAnotherState()
+    {
+        FakeHost fake;
+        ActionList events;
+        require(fake.client.submit(ClientUnitMoved(301, Land::Maithaius), events) &&
+                fake.client.submit(ClientUnitMoved(302, Land::Maithaius), events),
+                "no-op acknowledgement fixture could not queue commands");
+        eventually([&] { fake.poll(); return countKind(fake.received, "command") == 1; },
+                   "no-op fixture did not dispatch its first command");
+        fake.ack(1, true, 10, false);
+        eventually([&] { fake.poll(); return countKind(fake.received, "command") == 2; },
+                   "accepted no-op acknowledgement waited for a state the host will not publish");
+        require(fake.client.revision() == 10, "no-op acknowledgement changed the applied revision");
+        for(const auto& message : fake.received)
+            if(message.getString("kind") == "command")
+                require(message.getString("revision") == "10", "no-op continuation used an invented revision");
+    }
+
+    void testReconnectPresentationOrdering(bool receivedAckBeforeDisconnect)
+    {
+        FakeHost fake;
+        ActionList events;
+        require(fake.client.submit(ClientUnitMoved(401, Land::Maithaius), events) &&
+                fake.client.submit(ClientUnitMoved(402, Land::Maithaius), events),
+                "reconnect acknowledgement fixture could not queue commands");
+        eventually([&] { fake.poll(); return countKind(fake.received, "command") == 1; },
+                   "reconnect fixture did not dispatch its first command");
+        // Exercise both cuts after command1 was accepted: either its ack was
+        // received but state lost, or its view was queued with the ack lost.
+        fake.stateSequence = 1;
+        if(receivedAckBeforeDisconnect) fake.ack(1, true, 11);
+        else fake.state(11, false);
+        fake.deliveryFence();
+        require(fake.client.revision() == 10, "queued view applied without a UI callback");
+        require(countKind(fake.received, "command") == 1,
+                "acknowledgement released queued command before the disconnect cut");
+        fake.connection->close();
+        fake.connection.reset();
+        fake.received.clear();
+        eventually([&]
+        {
+            fake.client.poll();
+            if(!fake.connection) fake.connection = fake.listener.accept();
+            if(fake.connection) read(*fake.connection, fake.received);
+            return hasKind(fake.received, "hello");
+        }, "client did not reconnect its authenticated seat");
+        fake.welcome();
+        fake.deliveryFence();
+        fake.client.takeEvents(events);
+        require(events.empty() && fake.client.revision() == 10,
+                "reconnect welcome retained a view queued on the old connection");
+        const std::size_t retriedCommands = receivedAckBeforeDisconnect ? 0 : 1;
+        require(countKind(fake.received, "command") == retriedCommands,
+                "reconnect welcome released queued command before the fresh resume");
+
+        ActionList presentation;
+        presentation.push_back(MahjongInfo(Wind::West, "fresh reconnect presentation"));
+        fake.state(11, true, presentation);
+        eventually([&]
+        {
+            fake.poll(); fake.client.takeEvents(events);
+            return fake.client.revision() == 11;
+        }, "fresh reconnect view was not applied");
+        require(events.size() == 1, "fresh reconnect presentation was lost");
+        fake.deliveryFence();
+        require(countKind(fake.received, "command") == retriedCommands,
+                "queued command bypassed consumption of fresh reconnect presentation");
+        events.clear(); fake.client.takeEvents(events);
+        if(!receivedAckBeforeDisconnect)
+        {
+            fake.deliveryFence();
+            require(countKind(fake.received, "command") == 1,
+                    "queued command escaped while its predecessor still awaited a cached acknowledgement");
+            // A real host sends welcome+resume before it receives the retried
+            // sequence. An already consumed resume must satisfy this cached ack.
+            fake.ack(1, true, 11);
+        }
+        eventually([&] { fake.poll(); return countKind(fake.received, "command") == retriedCommands + 1; },
+                   "reconnect continuation remained blocked after acknowledgement and resume consumption");
+        for(const auto& message : fake.received)
+            if(message.getString("kind") == "command" && message.getString("sequence") == "2")
+                require(message.getString("revision") == "11" &&
+                        message.getObject("action")->getInteger("unit") == 402,
+                        "reconnect continuation lost its selected unit or current revision");
     }
 
     void testLateReadyRejectionKeepsNewPhaseCommands()
@@ -424,8 +539,23 @@ namespace
         }, "adventure phase fixture was not applied");
         require(fake.client.submit(ClientUnitMoved(201, Land::Maithaius), events),
                 "new adventure command was not queued behind old ready acknowledgement");
-        fake.ack(1, false);
-        fake.state(12, true);
+        fake.ack(1, false, 12);
+        fake.deliveryFence();
+        require(countKind(fake.received, "command") == 0,
+                "new-phase command bypassed the rejected ready's same-revision resume");
+        ActionList presentation;
+        presentation.push_back(AdventureTurn(Wind::West));
+        fake.state(12, true, presentation);
+        eventually([&]
+        {
+            fake.poll(); fake.client.takeEvents(events);
+            return !events.empty();
+        }, "same-revision resume presentation was not applied");
+        fake.deliveryFence();
+        require(countKind(fake.received, "command") == 0,
+                "new-phase command bypassed consumption of its same-revision resume");
+        events.clear();
+        fake.client.takeEvents(events);
         eventually([&]
         {
             fake.poll(); fake.client.takeEvents(events); events.clear();
@@ -510,7 +640,7 @@ namespace
             eventually([&] { host.poll(); peers[index].poll(); return peers[index].connected(); },
                        "ready fairness transport connection");
             auto hello = packet("hello");
-            hello.addInteger("protocol", 1); hello.addInteger("rulesContract", 1);
+            hello.addInteger("protocol", 2); hello.addInteger("rulesContract", 1);
             hello.addString("content", identity.id); hello.addInteger("contentVersion", identity.version);
             hello.addString("room", host.roomCode()); hello.addString("name", "Ready retry player");
             hello.addString("token", "");
@@ -620,7 +750,7 @@ namespace
             require(peer.connect("localhost", host.port(), error), error);
             eventually([&] { host.poll(); peer.poll(); return peer.connected(); }, "four-player connection");
             auto hello = packet("hello");
-            hello.addInteger("protocol", 1); hello.addInteger("rulesContract", 1);
+            hello.addInteger("protocol", 2); hello.addInteger("rulesContract", 1);
             hello.addString("content", identity.id); hello.addInteger("contentVersion", identity.version);
             hello.addString("room", host.roomCode()); hello.addString("name", "Concurrent player");
             hello.addString("token", "");
@@ -745,6 +875,9 @@ int runSessionProtocolTests()
         Recovery::setEnabled(false);
         testHostConsumptionBarrier();
         testClientCommandFifo();
+        testNoOpAckDoesNotRequireAnotherState();
+        testReconnectPresentationOrdering(false);
+        testReconnectPresentationOrdering(true);
         testLateReadyRejectionKeepsNewPhaseCommands();
         testClientStateOrdering();
         testEventActorMustBelongToRoster();

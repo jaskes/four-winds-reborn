@@ -34,8 +34,10 @@ choice. Summary pages use an explicit readiness barrier.
 - [x] Independent-process complete Duel and separate lost-ack reconnect tests.
 - [x] FFA/Coalition, AI seats and complete team results over the network.
 - [x] Direct private-room path with documented security and hosting model.
-- [ ] Android lifecycle and installable Windows/Android review builds.
-- [ ] Offline regression gate, cross-platform CI and a concrete play guide.
+- [x] Installable Windows/Android review builds and a concrete play guide.
+- [x] Offline regression gate.
+- [ ] Cross-platform CI on the final multiplayer code.
+- [ ] Android lifecycle on a physical device and a separate-network Internet match.
 
 September 6 evidence: independent Quick Duel processes completed all six phases
 with identical final categories, team standings and revision. A second complete
@@ -77,6 +79,18 @@ The fixture now waits for an actual human choice and exact acknowledgements;
 TLS framing now pauses bounded reads until queue space is available. Both
 failures were reproduced locally before their fixes. The corrected CI run is
 required before closing the remaining CI item.
+
+The next run passed every job except the macOS Release command FIFO check.
+Splitting acknowledgement and state delivery reproduced a real client race:
+the next command could use the previous revision before its resulting view
+arrived. Protocol 2 now identifies the request covered by each state and keeps
+dispatch behind that state's UI consumption. Focused tests explicitly delay
+the state, cover no-op acknowledgements and same-revision rejection resumes,
+and reconnect with a fresh resume arriving before the cached acknowledgement.
+Reconnect welcome also discards views queued on the previous connection.
+The full local Windows suite passes 25/25, including all six independent-process
+network matches, after this correction. The updated cross-platform CI remains
+the final automated gate. All devices must use the protocol-2 build together.
 
 The direct Internet route uses a reachable host IPv4/port or shared VPN; there
 is no public relay or matchmaking service. See the

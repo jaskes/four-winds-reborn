@@ -24,7 +24,7 @@ namespace Multiplayer
 namespace
 {
 using Clock = std::chrono::steady_clock;
-constexpr int ProtocolVersion = 1;
+constexpr int ProtocolVersion = 2;
 constexpr int RulesContractVersion = 1;
 
 std::string nonce(std::size_t bytes)
@@ -155,7 +155,11 @@ struct MatchSession::Impl
     bool localDeliveryPending = false;
     bool awaitingConsumption = false;
     std::uint64_t deliveredRevision = 0;
+    std::uint64_t deliveredSequence = 0;
     std::uint64_t clientConsumed = 0;
+    std::uint64_t clientConsumedSequence = 0;
+    std::uint64_t acknowledgedRevision = 0;
+    std::uint64_t acknowledgedSequence = 0;
     int battleChoice = -1;
     Clock::time_point lastReceive = Clock::now();
     Clock::time_point lastPing = Clock::now();
@@ -220,6 +224,7 @@ struct MatchSession::Impl
         const Avatar recipient = config.players[index].avatar;
         auto packet = envelope("state");
         packet.addString("revision", std::to_string(authority.revision()));
+        packet.addString("sequence", std::to_string(seats[index].lastSequence));
         packet.addInteger("phase", authority.phase());
         packet.addObject("view", buildClientView(recipient));
         packet.addBoolean("resume", resume);
@@ -343,6 +348,8 @@ struct MatchSession::Impl
         }
         ack.addBoolean("accepted", accepted);
         ack.addInteger("reason", static_cast<int>(rejection.reason));
+        ack.addString("revision", std::to_string(authority.revision()));
+        ack.addBoolean("state", begun && (!accepted || authority.revision() != before));
         seat.lastSequence = sequence;
         seat.acknowledgements.emplace_back(sequence, ack);
         if(seat.acknowledgements.size() > 64) seat.acknowledgements.pop_front();
@@ -543,8 +550,12 @@ struct MatchSession::Impl
             options.mode = packet.getString("mode");
             options.ruleset = packet.getString("ruleset");
             welcomed = true;
+            // Views buffered on the previous socket cannot stand in for the
+            // fresh resume that follows this welcome, even at the same revision.
+            updates.clear();
             awaitingConsumption = false;
             clientConsumed = 0;
+            clientConsumedSequence = 0;
             message = "Connected; waiting for host";
             if(pending.size()) send(*server, pending);
             return;
@@ -571,8 +582,9 @@ struct MatchSession::Impl
         }
         if(kind == "state" && welcomed)
         {
-            std::uint64_t revision = 0;
-            if(!counter(packet, "revision", revision) || !packet.isObject("view") ||
+            std::uint64_t revision = 0, sequence = 0;
+            if(!counter(packet, "revision", revision) || !counter(packet, "sequence", sequence) ||
+               sequence > sentSequence || !packet.isObject("view") ||
                !packet.isArray("events") || !packet.isInteger("phase") || !packet.isBoolean("resume") ||
                packet.getArray("events")->size() > 128 || updates.size() >= 32)
             { server->close(); return; }
@@ -588,8 +600,9 @@ struct MatchSession::Impl
         }
         if(kind == "ack" && welcomed)
         {
-            std::uint64_t sequence = 0;
-            if(!counter(packet, "sequence", sequence) || !packet.isBoolean("accepted"))
+            std::uint64_t sequence = 0, revision = 0;
+            if(!counter(packet, "sequence", sequence) || !counter(packet, "revision", revision) ||
+               !packet.isBoolean("accepted") || !packet.isBoolean("state"))
             { server->close(); return; }
             if(sequence == sentSequence && pending.size())
             {
@@ -597,6 +610,16 @@ struct MatchSession::Impl
                 // completed that phase. Its delayed rejection must not cancel
                 // commands already selected on the next screen or turn.
                 const bool rejectedCurrentContext = !packet.getBoolean("accepted") && sameContext(pendingIntent);
+                // An acknowledgement and its state can arrive in separate
+                // polls. Keep the next intent behind the actual presentation,
+                // identified by the request sequence as well as its revision.
+                // A reconnect may already have delivered that state before a
+                // cached acknowledgement; a no-op ready needs no new state.
+                if(packet.getBoolean("state"))
+                {
+                    acknowledgedRevision = std::max(acknowledgedRevision, revision);
+                    acknowledgedSequence = std::max(acknowledgedSequence, sequence);
+                }
                 pending.clear();
                 if(rejectedCurrentContext) cancelCommands();
                 message = rejectedCurrentContext ? "State changed; choose again" : "Connected";
@@ -617,7 +640,8 @@ struct MatchSession::Impl
     {
         if(!begun || !welcomed || !server || !server->connected() || serverPaused ||
            pending.size() || commands.empty() || awaitingConsumption || !updates.empty() ||
-           clientConsumed != applied) return;
+           clientConsumed != applied || clientConsumed < acknowledgedRevision ||
+           clientConsumedSequence < acknowledgedSequence) return;
         if(!sameContext(commands.front())) { cancelCommands(); return; }
         const auto intent = std::move(commands.front());
         commands.pop_front();
@@ -642,6 +666,7 @@ struct MatchSession::Impl
             helloSent = false;
             awaitingConsumption = false;
             clientConsumed = 0;
+            clientConsumedSequence = 0;
             if(now < nextConnect) return;
             nextConnect = now + std::chrono::seconds(1);
             server = std::make_unique<SecureConnection>(code);
@@ -838,6 +863,7 @@ void MatchSession::takeEvents(ActionList& events)
             seen.addString("revision", std::to_string(impl->deliveredRevision));
             impl->send(*impl->server, seen);
             impl->clientConsumed = impl->deliveredRevision;
+            impl->clientConsumedSequence = impl->deliveredSequence;
         }
         impl->awaitingConsumption = false;
     }
@@ -882,6 +908,7 @@ void MatchSession::takeEvents(ActionList& events)
     if(!applyClientView(*packet.getObject("view"), &error))
     { impl->message = "Invalid server state: " + error; impl->server->close(); return; }
     counter(packet, "revision", impl->applied);
+    counter(packet, "sequence", impl->deliveredSequence);
     impl->currentPhase = packet.getInteger("phase");
     impl->begun = true;
     impl->observeEvents(decoded);
