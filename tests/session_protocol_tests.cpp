@@ -1,4 +1,5 @@
 #include <chrono>
+#include <algorithm>
 #include <array>
 #include <functional>
 #include <iostream>
@@ -101,6 +102,16 @@ namespace
         hello.addString("token", "");
         send(remote, hello);
         std::vector<JsonObject> messages;
+        auto hostDeliveryFence = [&]
+        {
+            const auto pongs = countKind(messages, "pong");
+            send(remote, packet("ping"));
+            eventually([&]
+            {
+                host.poll(); read(remote, messages);
+                return countKind(messages, "pong") > pongs;
+            }, "host did not process the inbound packet fence");
+        };
         eventually([&] { host.poll(); read(remote, messages); return hasKind(messages, "welcome"); }, "host admission");
         remote.close();
         require(remote.connect("localhost", host.port(), error), error);
@@ -135,7 +146,7 @@ namespace
         ready.addString("revision", std::to_string(firstRevision));
         ready.addInteger("phase", Menu::ShowPlayers);
         send(remote, ready);
-        for(int i = 0; i < 8; ++i) { host.poll(); remote.poll(); }
+        hostDeliveryFence();
         require(host.revision() == firstRevision, "Receiving events prematurely acknowledged host consumption");
         host.takeEvents(events);
         eventually([&] { host.poll(); read(remote, messages); return host.revision() > firstRevision; }, "remote ready stayed blocked after consumption");
@@ -150,7 +161,8 @@ namespace
         acknowledge(remote, handRevision);
         require(host.submit(ClientReady(), events) && host.submit(ClientReady(), events),
                 "same-screen consecutive host commands must both queue");
-        for(int i = 0; i < 8; ++i) { host.takeEvents(events); host.poll(); remote.poll(); }
+        host.takeEvents(events);
+        hostDeliveryFence();
         require(host.revision() == handRevision, "Host GameData changed while prior UI events were still queued");
         events.clear(); host.takeEvents(events);
         eventually([&] { host.poll(); read(remote, messages); return host.revision() > handRevision; }, "first queued host command never executed");
@@ -159,7 +171,7 @@ namespace
         acknowledge(remote, commandRevision);
         host.takeEvents(events);
         require(!events.empty(), "ClientReady should restore rune presentation events");
-        for(int i = 0; i < 8; ++i) { host.poll(); remote.poll(); }
+        hostDeliveryFence();
         require(host.revision() == commandRevision, "second host command bypassed the first command's animation");
         events.clear(); host.takeEvents(events);
         eventually([&] { host.poll(); read(remote, messages); return host.revision() > commandRevision; }, "second queued host command was lost");
@@ -169,12 +181,17 @@ namespace
         // can read either the acknowledgement or its resulting snapshot.
         const auto beforeLostAck = host.revision();
         acknowledge(remote, beforeLostAck);
-        events.clear(); host.takeEvents(events); events.clear(); host.takeEvents(events);
         auto command = packet("command");
         command.addString("sequence", "2");
         command.addString("revision", std::to_string(beforeLostAck));
         command.addObject("action", ClientReady());
         send(remote, command);
+        hostDeliveryFence();
+        require(host.revision() == beforeLostAck,
+                "lost-ack command bypassed the held host presentation");
+        // Ensure the request has reached the host before its barrier opens;
+        // otherwise the first automatic draw could run ahead of this command.
+        events.clear(); host.takeEvents(events); events.clear(); host.takeEvents(events);
         eventually([&] { host.poll(); return host.revision() > beforeLostAck; }, "lost-ack command not accepted");
         require(host.revision() == beforeLostAck + 1, "unexpected accepted-command revision delta");
         const auto acceptedRevision = host.revision();
@@ -369,14 +386,16 @@ namespace
 
         void deliveryFence()
         {
-            const auto replies = countKind(received, "pong");
-            send(*connection, packet("ping"));
-            eventually([&] { poll(); return countKind(received, "pong") > replies; },
-                       "client did not process the packet-delivery fence");
-            // Flush anything queued after the pong in the same client poll.
-            const auto until = Clock::now() + std::chrono::milliseconds(20);
-            do { poll(); std::this_thread::sleep_for(std::chrono::milliseconds(1)); }
-            while(Clock::now() < until);
+            // Pong1 proves earlier server packets were processed. A command
+            // can be queued after pong1 in that same client poll, so pong2
+            // proves those later client messages were received as well.
+            for(int round = 0; round < 2; ++round)
+            {
+                const auto replies = countKind(received, "pong");
+                send(*connection, packet("ping"));
+                eventually([&] { poll(); return countKind(received, "pong") > replies; },
+                           "client did not process the packet-delivery fence");
+            }
         }
     };
 
@@ -389,7 +408,7 @@ namespace
                 fake.client.submit(ClientUnitMoved(103, Land::Maithaius), events),
                 "multiple movement commands from one click must queue");
         eventually([&] { fake.poll(); return countKind(fake.received, "command") == 1; }, "first client intent not dispatched");
-        for(int i = 0; i < 8; ++i) fake.poll();
+        fake.deliveryFence();
         require(countKind(fake.received, "command") == 1, "client sent a second unacknowledged command");
         fake.ack(1, true, 11);
         fake.deliveryFence();
@@ -400,7 +419,8 @@ namespace
         fake.state(11, false, presentation);
         eventually([&] { fake.poll(); fake.client.takeEvents(events); return fake.client.revision() == 11; }, "next state not applied");
         require(events.size() == 1, "resulting state did not deliver its presentation event");
-        for(int i = 0; i < 8; ++i) { fake.client.takeEvents(events); fake.poll(); }
+        fake.client.takeEvents(events);
+        fake.deliveryFence();
         require(countKind(fake.received, "command") == 1, "second command bypassed state-consumed callback");
         events.clear();
         fake.client.takeEvents(events);
@@ -414,14 +434,32 @@ namespace
                 commands[1].getObject("action")->getInteger("unit") == 102, "movement FIFO order changed");
         fake.ack(2, false, 11);
         fake.state(11, true);
-        for(int i = 0; i < 20; ++i)
-        { fake.poll(); fake.client.takeEvents(events); events.clear(); }
+        fake.deliveryFence();
+        fake.client.takeEvents(events); // Apply the rejection's empty resume.
+        fake.client.takeEvents(events); // Consume it, permitting any surviving intent.
+        fake.deliveryFence();
         require(countKind(fake.received, "command") == 2, "rejected command did not cancel remaining intent queue");
+
+        // Keep an actual presentation pending while the next intent is queued.
+        // Without this barrier the client may correctly dispatch before the
+        // changed-turn packet has even arrived, making cancellation untestable.
+        fake.state(12, false, presentation);
+        fake.deliveryFence();
+        fake.client.takeEvents(events);
+        require(fake.client.revision() == 12 && events.size() == 1,
+                "turn-change fixture did not hold a delivered presentation");
         require(fake.client.submit(ClientUnitMoved(104, Land::Maithaius), events), "enqueue command before changed turn");
         fake.view.addString("wind:current", Wind(Wind::East).toString());
-        fake.state(12, false);
-        eventually([&] { fake.poll(); fake.client.takeEvents(events); return fake.client.revision() == 12; }, "changed-turn view not applied");
-        for(int i = 0; i < 8; ++i) { fake.client.takeEvents(events); fake.poll(); }
+        fake.state(13, false);
+        fake.deliveryFence();
+        fake.client.takeEvents(events); // A nonempty presentation still blocks replacement.
+        require(fake.client.revision() == 12 && countKind(fake.received, "command") == 2,
+                "queued movement or replacement state bypassed the pending presentation");
+        events.clear();
+        fake.client.takeEvents(events);
+        require(fake.client.revision() == 13, "delivered changed-turn view was not applied");
+        fake.client.takeEvents(events);
+        fake.deliveryFence();
         require(countKind(fake.received, "command") == 2, "queued movement crossed into a different turn");
     }
 
@@ -576,26 +614,28 @@ namespace
         fake.state(11, false);
         // Deliver both packets before the UI applies either one. Comparing
         // against only the applied revision would enqueue both and roll back.
-        for(int i = 0; i < 8; ++i) fake.poll();
-        for(int i = 0; i < 8; ++i)
-        { fake.client.takeEvents(events); events.clear(); fake.poll(); }
+        fake.deliveryFence();
+        fake.client.takeEvents(events);
+        fake.client.takeEvents(events);
         require(fake.client.revision() == 12, "queued older state rolled back the client revision");
 
         ActionList announcement;
         announcement.push_back(MahjongInfo(Wind::West, "one presentation only"));
         fake.state(13, false, announcement);
         fake.state(13, false, announcement);
+        fake.deliveryFence();
         std::size_t delivered = 0;
-        for(int i = 0; i < 20; ++i)
+        // One callback for each of the two already received state packets.
+        for(int i = 0; i < 2; ++i)
         {
-            fake.poll(); fake.client.takeEvents(events);
+            fake.client.takeEvents(events);
             delivered += events.size(); events.clear();
         }
         require(fake.client.revision() == 13 && delivered == 1,
                 "duplicate regular state replayed its presentation events");
         fake.state(12, true);
-        for(int i = 0; i < 8; ++i)
-        { fake.poll(); fake.client.takeEvents(events); events.clear(); }
+        fake.deliveryFence();
+        fake.client.takeEvents(events);
         require(fake.client.revision() == 13, "stale resume rolled back an applied state");
     }
 
@@ -702,12 +742,21 @@ namespace
             published[index] = countKind(responses[index], "state");
         ready(0); // Same player's fresh sequence, already-ready phase.
         eventually([&] { pump(); return !inFlight[0]; }, "idempotent ready retry was not acknowledged");
-        const auto quietUntil = Clock::now() + std::chrono::milliseconds(100);
-        while(Clock::now() < quietUntil)
+        // Fence every ordered stream after the ready result. A delayed state
+        // publication must be observed before asserting that no state was sent.
+        std::array<std::size_t, 3> pongs{};
+        for(std::size_t index = 0; index < peers.size(); ++index)
+        {
+            pongs[index] = countKind(responses[index], "pong");
+            send(peers[index], packet("ping"));
+        }
+        eventually([&]
         {
             pump();
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        }
+            for(std::size_t index = 0; index < peers.size(); ++index)
+                if(countKind(responses[index], "pong") == pongs[index]) return false;
+            return true;
+        }, "duplicate-ready result did not reach every peer");
         require(host.revision() == initialRevision + 1, "duplicate readiness changed match revision");
         for(std::size_t index = 0; index < peers.size(); ++index)
             require(countKind(responses[index], "state") == published[index],
@@ -837,9 +886,10 @@ namespace
         };
         eventually([&]
         {
-            host.poll(); receiveStates(true);
-            // Hold the final presentation so the next draw cannot conceal an
-            // extra unintended advancement in the revision assertion below.
+            host.poll(); receiveStates(GameData::dropStone.isValid());
+            // Hold the final presentations on host and peers. An ACK may
+            // precede its state, so deliberately leave that state unconsumed
+            // until all replies have arrived instead of depending on timing.
             if(GameData::dropStone.isValid()) consumeHost();
             return acceptedReplies() == 3;
         }, "concurrent same-revision discard responses did not all complete");
@@ -848,11 +898,30 @@ namespace
                 "all-pass resolution must advance the discard once, accepting each vote once");
         const auto resolvedRevision = host.revision();
         const auto resolvedHash = Replay::authoritativeStateHash();
+        eventually([&]
+        {
+            host.poll(); receiveStates(false);
+            return std::all_of(latest.begin(), latest.end(),
+                [&](std::uint64_t revision) { return revision == resolvedRevision; });
+        }, "resolved-discard state did not reach every peer");
+        for(std::size_t index = 0; index < peers.size(); ++index)
+            acknowledge(peers[index], resolvedRevision);
         auto delayed = packet("command");
         delayed.addString("sequence", "3");
         delayed.addString("revision", std::to_string(discardRevision));
         delayed.addObject("action", ClientButtonPass());
         send(peers[0], delayed);
+        const auto pongs = countKind(responses[0], "pong");
+        send(peers[0], packet("ping"));
+        eventually([&]
+        {
+            host.poll(); receiveStates(false);
+            return countKind(responses[0], "pong") > pongs;
+        }, "delayed discard command did not reach the held host");
+        require(host.revision() == resolvedRevision,
+                "host advanced before its resolved-discard presentation was consumed");
+        // The ordered pong proves the command is queued. Releasing the host
+        // now exercises rejection before an unrelated automatic draw can run.
         consumeHost();
         bool rejected = false;
         eventually([&]

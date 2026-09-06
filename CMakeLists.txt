@@ -357,10 +357,24 @@ if(BUILD_TESTING AND NOT ANDROID)
     add_test(NAME multiplayer_secure_transport COMMAND secure_transport_tests)
     set_tests_properties(multiplayer_secure_transport PROPERTIES TIMEOUT 90)
     set_tests_properties(multiplayer_transport multiplayer_authority multiplayer_client_view PROPERTIES TIMEOUT 120)
-    add_test(NAME match_mode_matrix COMMAND gameplay_regression_tests --match-mode-matrix-self-test)
-    set_tests_properties(match_mode_matrix PROPERTIES
-        TIMEOUT 240
-        ENVIRONMENT "FOUR_WINDS_RECOVERY_DIR=${CMAKE_BINARY_DIR}/match-mode-matrix/recovery;FOUR_WINDS_SAVE_DIR=${CMAKE_BINARY_DIR}/match-mode-matrix/saves")
+    # Preserve all twenty seeded match/replay/save cases while giving each
+    # case an independent deadline and an identifiable failure on slow Debug
+    # runners. The numeric order matches runMatchModeMatrixTests().
+    set(match_matrix_case_index 0)
+    foreach(match_matrix_mode classic_ffa legacy_duel duel coalition)
+        foreach(match_matrix_difficulty training easy normal hard unfair)
+            set(match_matrix_name "match_mode_matrix_${match_matrix_mode}_${match_matrix_difficulty}")
+            set(match_matrix_directory "${CMAKE_BINARY_DIR}/match-mode-matrix/${match_matrix_mode}_${match_matrix_difficulty}")
+            file(MAKE_DIRECTORY "${match_matrix_directory}/simulation")
+            add_test(NAME "${match_matrix_name}" COMMAND gameplay_regression_tests --match-mode-matrix-self-test)
+            set_tests_properties("${match_matrix_name}" PROPERTIES
+                TIMEOUT 120
+                LABELS match_mode_matrix
+                WORKING_DIRECTORY "${match_matrix_directory}/simulation"
+                ENVIRONMENT "FOUR_WINDS_MATCH_MATRIX_CASE=${match_matrix_case_index};FOUR_WINDS_SETTINGS_FILE=${match_matrix_directory}/settings.json;FOUR_WINDS_RECOVERY_DIR=${match_matrix_directory}/recovery;FOUR_WINDS_SAVE_DIR=${match_matrix_directory}/saves;FOUR_WINDS_DIAGNOSTICS_DIR=${match_matrix_directory}/diagnostics")
+            math(EXPR match_matrix_case_index "${match_matrix_case_index} + 1")
+        endforeach()
+    endforeach()
     set_tests_properties(state_integrity PROPERTIES
         TIMEOUT 90
         ENVIRONMENT "FOUR_WINDS_RECOVERY_DIR=${CMAKE_BINARY_DIR}/state-integrity/recovery;FOUR_WINDS_SAVE_DIR=${CMAKE_BINARY_DIR}/state-integrity/saves")

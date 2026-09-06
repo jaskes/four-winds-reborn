@@ -92,6 +92,20 @@ The full local Windows suite passes 25/25, including all six independent-process
 network matches, after this correction. The updated cross-platform CI remains
 the final automated gate. All devices must use the protocol-2 build together.
 
+CI for gameplay commit `07f442b` passed Windows, Linux, Android and all six
+network matches on both macOS configurations. Later protocol assertions exposed
+fixture ordering assumptions: a queued command could legitimately be sent before
+the test delivered a changed turn, and an unacknowledged final-discard view could
+block the test's delayed request. The fixtures now use ordered ping/pong fences
+and explicit presentation consumption, including the remaining host and client
+negative assertions. Both failing cases were reproduced locally first. The
+twenty-case offline matrix also exceeded its aggregate Debug deadline while
+continuing to make progress; CTest now runs those same seeds and replay/save
+assertions as twenty isolated, individually timed cases with flushed progress.
+The affected local checks pass 21/21, with another five consecutive protocol
+runs passing and an invalid matrix selector rejected explicitly. These
+follow-ups change tests only; the protocol-2 review binaries remain valid.
+
 The direct Internet route uses a reachable host IPv4/port or shared VPN; there
 is no public relay or matchmaking service. See the
 [play guide](MultiplayerPlayGuide.md) for exact setup and in-memory reconnect

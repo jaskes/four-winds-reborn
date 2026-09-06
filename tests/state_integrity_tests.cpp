@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <chrono>
 #include <filesystem>
 #include <iostream>
 #include <string>
@@ -195,8 +196,29 @@ int runStateIntegrityTests()
 
 int runMatchModeMatrixTests()
 {
+    // CTest selects exactly one reproducible case. Omitting the selector keeps
+    // the existing manual command useful as a complete twenty-case matrix.
+    int selectedCase = -1;
+    if(const char* requested = std::getenv("FOUR_WINDS_MATCH_MATRIX_CASE"))
+    {
+        const std::string value(requested);
+        bool valid = !value.empty() && value.size() <= 2;
+        int parsed = 0;
+        for(char digit : value)
+        {
+            if(!valid || digit < '0' || digit > '9') { valid = false; break; }
+            parsed = parsed * 10 + digit - '0';
+        }
+        if(!valid || parsed >= 20)
+        {
+            std::cerr << "FAIL: FOUR_WINDS_MATCH_MATRIX_CASE must be an integer from 0 to 19\n";
+            return 2;
+        }
+        selectedCase = parsed;
+    }
     int failures = 0;
     int matches = 0;
+    int caseIndex = 0;
     const auto check = [&](bool valid, const std::string & message) {
         if(!valid) { ++failures; std::cerr << "FAIL: " << message << '\n'; }
     };
@@ -208,8 +230,10 @@ int runMatchModeMatrixTests()
                                      AI::Difficulty::Normal, AI::Difficulty::Hard,
                                      AI::Difficulty::Unfair})
         {
+            const int currentCase = caseIndex++;
+            if(selectedCase >= 0 && selectedCase != currentCase) continue;
             Simulation::MatchConfig config;
-            config.seed = 605020 + matches;
+            config.seed = 605020 + currentCase;
             config.difficulty = difficulty;
             config.matchTopologyId = topology->id();
             config.matchTopologyVersion = topology->version();
@@ -229,6 +253,8 @@ int runMatchModeMatrixTests()
             selectActiveRuneGameRuleset(config.runeGameRulesetId, config.runeGameRulesetVersion);
             const std::string label = topology->id() + "@" + std::to_string(topology->version()) +
                 "/" + AI::difficultyName(difficulty);
+            const auto started = std::chrono::steady_clock::now();
+            std::cout << "mode matrix: " << label << " seed=" << config.seed << " stage=simulation" << std::endl;
             const auto result = Simulation::runMatch(config);
             check(result.completed(), label + " completes: " + result.error);
             if(!result.completed()) continue;
@@ -244,17 +270,24 @@ int runMatchModeMatrixTests()
                               label + " teammates share final score and rank");
 
             std::string error;
+            std::cout << "mode matrix: " << label << " seed=" << config.seed << " stage=replay ticks=" <<
+                result.ticks << std::endl;
             const bool replayed = Replay::run(result.actionReplay, &error);
             check(replayed, label + " replay: " + error);
+            std::cout << "mode matrix: " << label << " seed=" << config.seed << " stage=save-roundtrip" << std::endl;
             const std::string hash = Replay::authoritativeStateHash();
             const JsonObject save = GameData::authoritativeState();
             const bool loaded = Recovery::validateSaveState(save, &error) && GameData::restoreState(save);
             check(loaded, label + " final state is loadable: " + error);
             check(Replay::authoritativeStateHash() == hash, label + " save round trip retains state");
-            std::cout << "mode matrix: " << label << " seed=" << config.seed << '\n';
+            const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - started).count();
+            std::cout << "mode matrix: " << label << " seed=" << config.seed << " stage=complete elapsed_ms=" <<
+                elapsed << std::endl;
         }
     }
-    check(matches == 20, "all 20 mode/difficulty combinations complete");
-    if(!failures) std::cout << "match mode matrix: 20 matches and replays ok\n";
+    const int expected = selectedCase < 0 ? 20 : 1;
+    check(matches == expected, "all selected mode/difficulty combinations complete");
+    if(!failures) std::cout << "match mode matrix: " << matches << " matches and replays ok\n";
     return failures ? 1 : 0;
 }
