@@ -1,5 +1,7 @@
 # Multiplayer play guide
 
+[Инструкция запуска и приёмки на русском](MultiplayerAcceptanceRU.md).
+
 This describes the multiplayer development build on `develop` (0.6.0). The
 `v0.5.0` tag contains the accepted local modes and does not include networking.
 Use the same multiplayer build and content package on every device.

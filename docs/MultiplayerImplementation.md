@@ -5,6 +5,16 @@ The accepted local feature set is frozen at `v0.5.0`, commit
 GitHub Release publication is deliberately deferred. Development continues on
 `develop`. Never move the tag to include multiplayer work.
 
+The verified multiplayer checkpoint is `a7ac4f9` (protocol 2). Its
+[CI run 34044512867](https://github.com/jaskes/four-winds-reborn/actions/runs/34044512867)
+passed all eight jobs: Windows Debug/Release each 44/44 tests, Linux and macOS
+Debug/Release each 43/43, plus Android build/lint/package checks and theme data.
+All six independent-process network scenarios passed in every desktop job.
+Local Windows/Android review packages have been rebuilt from this exact commit.
+Physical Android lifecycle and a match across separate Internet networks remain
+open. Use the [Russian acceptance guide](MultiplayerAcceptanceRU.md) for those
+checks. No device was attached to ADB at this checkpoint.
+
 ## Completion contract
 
 Working multiplayer means a complete match between independent clients, through
@@ -36,7 +46,7 @@ choice. Summary pages use an explicit readiness barrier.
 - [x] Direct private-room path with documented security and hosting model.
 - [x] Installable Windows/Android review builds and a concrete play guide.
 - [x] Offline regression gate.
-- [ ] Cross-platform CI on the final multiplayer code.
+- [x] Cross-platform CI on the final multiplayer code.
 - [ ] Android lifecycle on a physical device and a separate-network Internet match.
 
 September 6 evidence: independent Quick Duel processes completed all six phases
@@ -77,8 +87,8 @@ macOS checks exposed a test that failed to consume the automatic first draw and
 a real ciphertext-queue overflow when sender and receiver progress differed.
 The fixture now waits for an actual human choice and exact acknowledgements;
 TLS framing now pauses bounded reads until queue space is available. Both
-failures were reproduced locally before their fixes. The corrected CI run is
-required before closing the remaining CI item.
+failures were reproduced locally before their fixes and subsequently passed
+the final cross-platform CI recorded above.
 
 The next run passed every job except the macOS Release command FIFO check.
 Splitting acknowledgement and state delivery reproduced a real client race:
@@ -89,8 +99,8 @@ the state, cover no-op acknowledgements and same-revision rejection resumes,
 and reconnect with a fresh resume arriving before the cached acknowledgement.
 Reconnect welcome also discards views queued on the previous connection.
 The full local Windows suite passes 25/25, including all six independent-process
-network matches, after this correction. The updated cross-platform CI remains
-the final automated gate. All devices must use the protocol-2 build together.
+network matches, after this correction. The final cross-platform CI confirms
+this protocol on all platforms. All devices must use the protocol-2 build together.
 
 CI for gameplay commit `07f442b` passed Windows, Linux, Android and all six
 network matches on both macOS configurations. Later protocol assertions exposed
@@ -125,9 +135,9 @@ incorrectly refreshes the header timer is rejected by the updated deadline test.
 The direct Internet route uses a reachable host IPv4/port or shared VPN; there
 is no public relay or matchmaking service. See the
 [play guide](MultiplayerPlayGuide.md) for exact setup and in-memory reconnect
-limits. Cross-platform CI, final matrix and package evidence must be recorded
-before declaring the goal complete. A two-device Android lifecycle test and an
-actual route between separate Internet networks remain manual acceptance items.
+limits. Automated and package evidence is recorded above. A two-device Android
+lifecycle test and an actual route between separate Internet networks remain
+manual acceptance items before declaring the goal complete.
 
 ## Review builds
 
