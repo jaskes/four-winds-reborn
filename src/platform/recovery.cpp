@@ -244,7 +244,7 @@ bool Recovery::validateSaveState(const SWE::JsonObject & state, std::string* err
     }
 
     const std::string myAvatar = myPerson->getString("avatar");
-    const std::string myClan = myPerson->getString("clan");
+    const std::string myClan = Clan(myPerson->getString("clan")).toString();
     if(!Avatar(myAvatar).isValid() || myAvatar == "random" || !Clan(myClan).isValid())
     {
         if(error) *error = "local player identity is invalid";
@@ -265,7 +265,7 @@ bool Recovery::validateSaveState(const SWE::JsonObject & state, std::string* err
         }
 
         const std::string avatar = player->getString("avatar");
-        const std::string clan = player->getString("clan");
+        const std::string clan = Clan(player->getString("clan")).toString();
         const std::string wind = player->getString("wind");
         if(!Avatar(avatar).isValid() || avatar == "random" ||
            !Clan(clan).isValid() || !match.hasWind(Wind(wind)()))
@@ -290,7 +290,7 @@ bool Recovery::validateSaveState(const SWE::JsonObject & state, std::string* err
         {
             const Land land(landId);
             if(!land.isTowerWinds() && owners->hasKey(land.toString()) &&
-               !clans.count(owners->getString(land.toString())))
+               !clans.count(Clan(owners->getString(land.toString())).toString()))
             {
                 if(error) *error = "territory has an invalid owner";
                 return false;
@@ -318,7 +318,7 @@ bool Recovery::validateSaveState(const SWE::JsonObject & state, std::string* err
             const Land land(landId);
             if(!land.isTowerWinds())
             {
-                const std::string owner = owners->getString(land.toString());
+                const std::string owner = Clan(owners->getString(land.toString())).toString();
                 if(!clans.count(owner))
                 {
                     if(error) *error = "Duel territory has no participating owner";

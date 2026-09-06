@@ -49,6 +49,33 @@ int runStateIntegrityTests()
     check(GameData::initMahjong(), "initialize source save");
     const JsonObject source = GameData::authoritativeState();
 
+    JsonObject aliasSave = source;
+    JsonObject aliasPerson = *source.getObject("myperson");
+    aliasPerson.addString("clan", "Maitha");
+    aliasSave.addObject("myperson", aliasPerson);
+    JsonArray aliasPlayers;
+    for(std::size_t index = 0; index < source.getArray("players")->size(); ++index)
+    {
+        JsonObject player = *source.getArray("players")->getObject(index);
+        if(player.getString("clan") == "red") player.addString("clan", "Maitha");
+        aliasPlayers.addObject(player);
+    }
+    aliasSave.addArray("players", aliasPlayers);
+    check(Recovery::validateSaveState(aliasSave) && GameData::restoreState(aliasSave),
+          "legacy clan aliases remain compatible with canonical island ownership");
+
+    EditableObject duplicateSave(source);
+    duplicateSave.erase("landOwners");
+    JsonArray duplicatePlayers;
+    for(std::size_t index = 0; index < source.getArray("players")->size(); ++index)
+    {
+        JsonObject player = *source.getArray("players")->getObject(index);
+        if(player.getString("clan") == "purple") player.addString("clan", "Maitha");
+        duplicatePlayers.addObject(player);
+    }
+    duplicateSave.addArray("players", duplicatePlayers);
+    check(!Recovery::validateSaveState(duplicateSave), "clan aliases cannot hide duplicate players");
+
     selectActiveMatchTopology(DuelTopologyId, DuelTopologyVersion);
     GameplayRng::seed(605002);
     GameData::initPersons(Person(Avatar::Lakkho, Clan::Yellow, Wind::East));
