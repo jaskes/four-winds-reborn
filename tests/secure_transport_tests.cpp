@@ -192,6 +192,56 @@ namespace
         }
     }
 
+    void testCiphertextQueueBackpressure()
+    {
+        for(const bool byteLimit : {false, true})
+        {
+            TcpLimits limits;
+            limits.maximumFrameBytes = 64;
+            limits.maximumQueuedBytes = byteLimit ? 68 : 256;
+            limits.maximumQueuedFrames = byteLimit ? 8 : 1;
+            limits.frameTimeout = std::chrono::milliseconds(20);
+            limits.receiveBackpressure = true;
+            TcpListener listener(limits);
+            TcpConnection sender;
+            std::unique_ptr<TcpConnection> receiver;
+            std::string error;
+            require(listener.listen(0, error) && sender.connect("localhost", listener.port(), error), error);
+            eventually([&]
+            {
+                sender.poll();
+                if(!receiver) receiver = listener.accept();
+                return sender.connected() && receiver;
+            }, "Ciphertext backpressure connection");
+            const std::vector<std::string> expected{std::string(64, 'a'), std::string(64, 'b'), std::string(64, 'c')};
+            for(const auto& frame : expected) require(sender.send(frame, error), error);
+            // Leave the completed input queue undrained past a frame deadline.
+            // Capacity must pause at frame boundaries, without starting a new
+            // peer deadline or accepting another payload into the full queue.
+            const auto holdUntil = Clock::now() + std::chrono::milliseconds(50);
+            while(Clock::now() < holdUntil)
+            {
+                sender.poll(); receiver->poll();
+                require(!receiver->closed(), "Ciphertext input backpressure closed instead of pausing: " + receiver->error());
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+            std::vector<std::string> delivered;
+            for(std::size_t index = 0; index < expected.size(); ++index)
+            {
+                std::string frame;
+                eventually([&]
+                {
+                    sender.poll(); receiver->poll();
+                    require(!receiver->closed(), "Ciphertext drain failed: " + receiver->error());
+                    return receiver->receive(frame);
+                }, "Ciphertext input did not resume after draining capacity");
+                delivered.push_back(frame);
+                require(!receiver->receive(frame), "Ciphertext input exceeded its one-frame byte/count capacity");
+            }
+            require(delivered == expected, "Ciphertext backpressure lost or reordered frames");
+        }
+    }
+
     void testLargeDuplexAndBounds()
     {
         TcpLimits limits;
@@ -208,8 +258,13 @@ namespace
         std::vector<std::string> serverMessages, clientMessages;
         eventually([&]
         {
+            // The OS may deliver an earlier sender burst while the receiver
+            // still consumes one small plaintext slice per poll.
+            for(int ahead = 0; ahead < 6; ++ahead) pair.client.poll();
             pair.poll();
-            require(!pair.client.closed() && !pair.server->closed(), "Partial TLS duplex I/O closed a healthy connection");
+            require(!pair.client.closed() && !pair.server->closed(),
+                    "Partial TLS duplex I/O closed a healthy connection: client=" + pair.client.error() +
+                    "; server=" + pair.server->error());
             std::string payload;
             while(pair.server->receive(payload)) serverMessages.push_back(payload);
             while(pair.client.receive(payload)) clientMessages.push_back(payload);
@@ -320,6 +375,7 @@ int main()
         testSecretValidation();
         testConfidentialityAndReplay();
         testTamperingAndWrongSecret();
+        testCiphertextQueueBackpressure();
         testLargeDuplexAndBounds();
         testAuthenticatedOversizeAndEof();
         testDeadlinesAndNoFallback();

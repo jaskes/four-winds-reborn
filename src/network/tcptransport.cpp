@@ -335,7 +335,21 @@ void TcpConnection::poll()
     std::size_t readBudget = state.limits.bytesPerPoll;
     for(int operations = 0; readBudget > 0 && operations < 64; ++operations)
     {
-        const auto amount = std::min(readBudget, buffer.size());
+        auto amount = std::min(readBudget, buffer.size());
+        if(state.limits.receiveBackpressure)
+        {
+            // Reserve capacity for a complete maximum-sized frame before
+            // accepting its header. A locally full queue then pauses between
+            // frames, without starting or extending a peer's frame deadline.
+            if(state.headerBytes == 0 &&
+               (state.incoming.size() >= state.limits.maximumQueuedFrames ||
+                state.incomingBytes + state.limits.maximumFrameBytes + 4 > state.limits.maximumQueuedBytes))
+                break;
+            // A recv() must not run past the reserved frame into the next
+            // header, whose capacity has not yet been checked.
+            amount = std::min(amount, state.headerBytes < state.header.size() ?
+                state.header.size() - state.headerBytes : state.expectedBytes - state.partial.size());
+        }
         const int received = static_cast<int>(::recv(state.socket, buffer.data(), static_cast<int>(amount), 0));
         if(received < 0)
         {

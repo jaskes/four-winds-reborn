@@ -69,6 +69,15 @@ Windows tests and Android API23 compilation pass. The Android arm64 APK builds,
 passes ABI/package/signature verification and lint. No Android device was
 attached to ADB during this run, so physical lifecycle acceptance remains open.
 
+The first cross-platform CI run passed Windows Debug/Release, Linux Debug/Release
+and Android. All six full network matches also passed on macOS. Two focused
+macOS checks exposed a test that failed to consume the automatic first draw and
+a real ciphertext-queue overflow when sender and receiver progress differed.
+The fixture now waits for an actual human choice and exact acknowledgements;
+TLS framing now pauses bounded reads until queue space is available. Both
+failures were reproduced locally before their fixes. The corrected CI run is
+required before closing the remaining CI item.
+
 The direct Internet route uses a reachable host IPv4/port or shared VPN; there
 is no public relay or matchmaking service. See the
 [play guide](MultiplayerPlayGuide.md) for exact setup and in-memory reconnect
@@ -78,15 +87,14 @@ actual route between separate Internet networks remain manual acceptance items.
 
 ## Review builds
 
-The tested gameplay implementation is commit `b20863a` on `develop`. Local
-review artifacts are stamped with that commit; later workflow/test-only
-follow-ups do not change their game code.
+Local review artifacts are built from `develop`. The exact gameplay commit and
+SHA256 values are recorded in `dist/multiplayer-review-builds.json`; Windows
+also includes a sibling `build-info.json`. Workflow/test/documentation-only
+follow-ups do not change that game code.
 
 - Windows: `dist/windows-v0.6.0-dev-network/four-winds-reborn.exe` (keep its
   sibling DLLs and `themes` directory).
 - Android: `dist/android/four-winds-reborn-v0.6.0-dev-network-android-arm64-debug.apk`.
-- Windows EXE SHA256: `4409d79c109a7dce10c68b21f6d00f3f722041022eb4d3ea42e3692aa232a73d`.
-- Android APK SHA256: `734cd8e72e58de228636e84e419d0b1b745bcf52d2c1e9cd379a3c2cfc49e168`.
 
 The accepted v0.5.0 local artifacts remain in their original locations. No
 GitHub Release or multiplayer release tag has been created.

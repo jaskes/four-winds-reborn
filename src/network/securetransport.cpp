@@ -43,6 +43,7 @@ namespace
         result.maximumFrameBytes = 64 * 1024;
         result.maximumQueuedBytes = std::max<std::size_t>(limits.maximumQueuedBytes, 256 * 1024);
         result.maximumQueuedFrames = std::max<std::size_t>(limits.maximumQueuedFrames, 64);
+        result.receiveBackpressure = true;
         return result;
     }
 
@@ -372,7 +373,8 @@ void SecureConnection::poll()
         {
             state.disconnect(received == 0 || received == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY ||
                              received == MBEDTLS_ERR_SSL_CONN_EOF ?
-                "Encrypted connection closed" : tlsError("Encrypted receive", received));
+                "Encrypted connection closed" + (state.raw->error().empty() ? std::string() :
+                    ": " + state.raw->error()) : tlsError("Encrypted receive", received));
             return;
         }
         budget -= static_cast<std::size_t>(received);
@@ -415,7 +417,8 @@ bool SecureConnection::closed() const { return !impl || impl->terminal; }
 const std::string& SecureConnection::error() const
 {
     static const std::string empty;
-    return impl ? impl->failure : empty;
+    if(!impl) return empty;
+    return impl->failure.empty() ? impl->raw->error() : impl->failure;
 }
 void SecureConnection::close()
 {

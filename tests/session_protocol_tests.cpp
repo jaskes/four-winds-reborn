@@ -48,11 +48,11 @@ namespace
         peer.poll();
     }
 
-    void read(SecureConnection& peer, std::vector<JsonObject>& messages)
+    void read(SecureConnection& peer, std::vector<JsonObject>& messages, std::size_t maximum = 4096)
     {
         peer.poll();
         std::string wire, error;
-        while(peer.receive(wire))
+        for(std::size_t count = 0; count < maximum && peer.receive(wire); ++count)
         {
             JsonObject message;
             require(parseWireObject(wire, message, error), error);
@@ -195,7 +195,13 @@ namespace
         send(remote, hello);
         eventually([&] { host.poll(); read(remote, messages); return hasKind(messages, "welcome") && hasKind(messages, "state"); }, "seat resume failed");
         send(remote, command);
-        eventually([&] { host.poll(); read(remote, messages); return hasKind(messages, "ack"); }, "duplicate sequence did not receive cached acknowledgement");
+        eventually([&]
+        {
+            host.poll(); read(remote, messages);
+            for(const auto& response : messages)
+                if(response.getString("kind") == "ack" && response.getString("sequence") == "2") return true;
+            return false;
+        }, "duplicate sequence did not receive cached acknowledgement");
         bool cachedAccepted = false;
         for(const auto& message : messages)
             if(message.getString("kind") == "ack" && message.getString("sequence") == "2")
@@ -204,33 +210,85 @@ namespace
                 Replay::authoritativeStateHash() == acceptedHash,
                 "lost-ack command was applied twice or rejected instead of deduplicated");
 
-        events.clear(); host.takeEvents(events); events.clear(); host.takeEvents(events);
-        auto rejectedWithoutMutation = [&](JsonObject request, const char* description)
+        // ClientReady above resumes presentation; it does not draw the first
+        // rune. Let the normal authority tick reach a real human choice, and
+        // consume its published view before testing command non-mutation.
+        // Otherwise a slow peer can acknowledge the pre-draw revision, trigger
+        // a legitimate draw, and leave every later command behind that unseen
+        // presentation barrier.
+        std::size_t consumedMessages = 0;
+        std::uint64_t consumedRevision = 0;
+        eventually([&]
         {
-            acknowledge(remote, acceptedRevision);
+            host.poll(); read(remote, messages, 1);
+            while(consumedMessages < messages.size())
+            {
+                const auto& message = messages[consumedMessages++];
+                if(message.getString("kind") != "state") continue;
+                consumedRevision = std::stoull(message.getString("revision"));
+                acknowledge(remote, consumedRevision);
+            }
+            events.clear(); host.takeEvents(events); events.clear(); host.takeEvents(events);
+            const auto* current = GameData::players().playerOfWind(GameData::currentWind);
+            return current && !current->isAI() &&
+                (current->newStone.isValid() || GameData::croupier.hasLuckDraw()) &&
+                consumedRevision == host.revision();
+        }, "first-draw view never reached a consumed human-choice state");
+
+        const JsonObject cachedRequest = command;
+        auto rejectedWithoutMutation = [&](JsonObject request, const char* description, bool stale = false)
+        {
+            const auto baselineRevision = host.revision();
+            const auto baselineHash = Replay::authoritativeStateHash();
+            const auto sequence = request.getString("sequence");
+            request.addString("revision", std::to_string(baselineRevision - (stale ? 1 : 0)));
+            // Cross the 100 ms authority cadence with no incoming command.
+            // A human-choice state must remain unchanged regardless of host
+            // speed or the delay before the next TLS message is dispatched.
+            std::this_thread::sleep_for(std::chrono::milliseconds(120));
+            for(int i = 0; i < 8; ++i) { host.poll(); remote.poll(); }
+            require(host.revision() == baselineRevision && Replay::authoritativeStateHash() == baselineHash,
+                    "rejection fixture was not parked at a stable human choice");
             messages.clear();
+            // Deliberately interleave an old accepted acknowledgement with the
+            // new rejected one. Dequeue one message at a time so ack and resume
+            // cannot accidentally appear atomic on fast loopback transports.
+            send(remote, cachedRequest);
             send(remote, request);
-            eventually([&] { host.poll(); read(remote, messages); return hasKind(messages, "ack"); }, description);
             bool rejected = false;
-            for(const auto& response : messages)
-                if(response.getString("kind") == "ack") rejected = !response.getBoolean("accepted");
-            require(rejected && host.revision() == acceptedRevision &&
-                    Replay::authoritativeStateHash() == acceptedHash, description);
+            eventually([&]
+            {
+                host.poll(); read(remote, messages, 1);
+                bool receivedAck = false;
+                for(const auto& response : messages)
+                {
+                    if(response.getString("kind") == "ack" && response.getString("sequence") == sequence)
+                    {
+                        receivedAck = true;
+                        rejected = !response.getBoolean("accepted");
+                        require(rejected, description);
+                    }
+                    if(receivedAck && response.getString("kind") == "state" && response.getBoolean("resume") &&
+                       response.getString("revision") == std::to_string(baselineRevision))
+                        return true;
+                }
+                return false;
+            }, std::string("timed out awaiting rejection and resume for sequence ") + sequence + ": " + description);
+            require(rejected && host.revision() == baselineRevision &&
+                    Replay::authoritativeStateHash() == baselineHash, description);
+            acknowledge(remote, baselineRevision);
         };
         command.addString("sequence", "3");
-        command.addString("revision", std::to_string(acceptedRevision));
         command.addString("avatar", host.localAvatar().toString());
         command.addObject("action", ClientDropIndex(0));
         rejectedWithoutMutation(command, "forged host actor bypassed connection seat binding");
         command = packet("command");
         command.addString("sequence", "4");
-        command.addString("revision", std::to_string(acceptedRevision));
         command.addObject("action", ClientSummonCreature(Creature::SkeletonHorde, Land::Maithaius, true));
         rejectedWithoutMutation(command, "forced action mutated authority state");
         command.addString("sequence", "5");
-        command.addString("revision", std::to_string(acceptedRevision - 1));
         command.addObject("action", ClientReady());
-        rejectedWithoutMutation(command, "stale revision mutated authority state");
+        rejectedWithoutMutation(command, "stale revision mutated authority state", true);
         host.leave();
     }
 

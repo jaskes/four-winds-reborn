@@ -24,6 +24,10 @@ namespace Multiplayer
         std::chrono::milliseconds connectTimeout{10000};
         std::chrono::milliseconds frameTimeout{15000};
         std::chrono::milliseconds writeTimeout{15000};
+        // Internal framed streams such as TLS ciphertext may pause socket
+        // reads until receive() drains their bounded completed-frame queue.
+        // Ordinary application transports keep rejecting queue overflow.
+        bool receiveBackpressure = false;
     };
 
     // Main-thread, nonblocking, length-prefixed payload transport. It accepts
