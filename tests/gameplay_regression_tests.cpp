@@ -1,5 +1,7 @@
 #include <algorithm>
+#include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
@@ -47,6 +49,7 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#include <dbghelp.h>
 #ifdef ERROR
 #undef ERROR
 #endif
@@ -4340,6 +4343,100 @@ int runRecoverySelfTest()
 }
 
 #if defined(_WIN32)
+bool validateWindowsCrashDump(const std::string & path, DWORD expectedThread,
+                              const std::string & report, std::string & error)
+{
+    const auto data = Systems::readFile(path);
+    const auto fail = [&](const char* message) { error = message; return false; };
+    if(data.empty()) return fail("dump cannot be read");
+    const auto contains = [&](std::size_t offset, std::size_t bytes) {
+        return offset <= data.size() && bytes <= data.size() - offset;
+    };
+    const auto read = [&](std::size_t offset, auto & value) {
+        if(!contains(offset, sizeof(value))) return false;
+        std::memcpy(&value, data.data() + offset, sizeof(value));
+        return true;
+    };
+
+    MINIDUMP_HEADER header = {};
+    if(!read(0, header) || std::memcmp(data.data(), "MDMP", 4) != 0 ||
+       (header.Version & 0xffff) != MINIDUMP_VERSION || !header.NumberOfStreams ||
+       header.NumberOfStreams > data.size() / sizeof(MINIDUMP_DIRECTORY) ||
+       !contains(header.StreamDirectoryRva,
+                 header.NumberOfStreams * sizeof(MINIDUMP_DIRECTORY)))
+        return fail("dump header or stream directory is invalid");
+
+    MINIDUMP_LOCATION_DESCRIPTOR exceptionLocation = {};
+    MINIDUMP_LOCATION_DESCRIPTOR threadsLocation = {};
+    for(ULONG32 index = 0; index < header.NumberOfStreams; ++index)
+    {
+        MINIDUMP_DIRECTORY stream = {};
+        if(!read(header.StreamDirectoryRva + index * sizeof(stream), stream) ||
+           !contains(stream.Location.Rva, stream.Location.DataSize))
+            return fail("dump stream exceeds the file");
+        if(stream.StreamType == ExceptionStream) exceptionLocation = stream.Location;
+        if(stream.StreamType == ThreadListStream) threadsLocation = stream.Location;
+    }
+
+    MINIDUMP_EXCEPTION_STREAM exception = {};
+    if(exceptionLocation.DataSize < sizeof(exception) ||
+       !read(exceptionLocation.Rva, exception) || exception.ThreadId != expectedThread ||
+       exception.ExceptionRecord.ExceptionCode != EXCEPTION_ACCESS_VIOLATION ||
+       exception.ExceptionRecord.NumberParameters != 2 ||
+       exception.ExceptionRecord.ExceptionInformation[0] != 1 ||
+       !exception.ExceptionRecord.ExceptionInformation[1] ||
+       !exception.ExceptionRecord.ExceptionAddress)
+        return fail("dump does not contain the real write-access violation");
+    const std::string addressBreadcrumb = "native crash test write-address=" +
+        std::to_string(exception.ExceptionRecord.ExceptionInformation[1]);
+    if(report.find(addressBreadcrumb + '\n') == std::string::npos)
+        return fail("dump fault address does not match the protected allocation");
+
+    CONTEXT context = {};
+    if(exception.ThreadContext.DataSize < sizeof(context) ||
+       !contains(exception.ThreadContext.Rva, exception.ThreadContext.DataSize) ||
+       !read(exception.ThreadContext.Rva, context) ||
+       (context.ContextFlags & CONTEXT_CONTROL) != CONTEXT_CONTROL)
+        return fail("dump exception register context is missing");
+    ULONG64 stackPointer = 0;
+#if defined(_M_X64) || defined(__x86_64__)
+    if(context.Rip != exception.ExceptionRecord.ExceptionAddress)
+        return fail("dump instruction pointer does not match the exception");
+    stackPointer = context.Rsp;
+#elif defined(_M_IX86) || defined(__i386__)
+    if(context.Eip != exception.ExceptionRecord.ExceptionAddress)
+        return fail("dump instruction pointer does not match the exception");
+    stackPointer = context.Esp;
+#elif defined(_M_ARM64) || defined(__aarch64__)
+    if(context.Pc != exception.ExceptionRecord.ExceptionAddress)
+        return fail("dump instruction pointer does not match the exception");
+    stackPointer = context.Sp;
+#endif
+    if(!stackPointer) return fail("dump stack pointer is missing");
+
+    ULONG32 threadCount = 0;
+    if(threadsLocation.DataSize < sizeof(threadCount) ||
+       !read(threadsLocation.Rva, threadCount) || !threadCount ||
+       threadCount > (threadsLocation.DataSize - sizeof(threadCount)) / sizeof(MINIDUMP_THREAD))
+        return fail("dump thread list is invalid");
+    for(ULONG32 index = 0; index < threadCount; ++index)
+    {
+        MINIDUMP_THREAD thread = {};
+        if(!read(threadsLocation.Rva + sizeof(threadCount) + index * sizeof(thread), thread))
+            return fail("dump thread record is truncated");
+        if(thread.ThreadId != expectedThread) continue;
+        if(!thread.Stack.Memory.DataSize ||
+           !contains(thread.Stack.Memory.Rva, thread.Stack.Memory.DataSize) ||
+           thread.ThreadContext.DataSize < sizeof(CONTEXT) ||
+           !contains(thread.ThreadContext.Rva, thread.ThreadContext.DataSize) ||
+           stackPointer < thread.Stack.StartOfMemoryRange ||
+           stackPointer - thread.Stack.StartOfMemoryRange >= thread.Stack.Memory.DataSize)
+            return fail("dump crash thread stack or register context is incomplete");
+        return true;
+    }
+    return fail("dump crash thread is absent from the thread list");
+}
+
 int runWindowsCrashReportSelfTest(const char* executable)
 {
     const char* directoryValue = std::getenv("FOUR_WINDS_DIAGNOSTICS_DIR");
@@ -4377,44 +4474,84 @@ int runWindowsCrashReportSelfTest(const char* executable)
     const DWORD waitResult = WaitForSingleObject(process.hProcess, 30000);
     DWORD exitCode = STILL_ACTIVE;
     GetExitCodeProcess(process.hProcess, &exitCode);
+    if(waitResult != WAIT_OBJECT_0 && exitCode == STILL_ACTIVE)
+    {
+        TerminateProcess(process.hProcess, 3);
+        WaitForSingleObject(process.hProcess, 5000);
+        GetExitCodeProcess(process.hProcess, &exitCode);
+    }
     CloseHandle(process.hThread);
     CloseHandle(process.hProcess);
 
     constexpr int captureAttemptsMaximum = 40;
     constexpr DWORD captureRetryDelayMs = 50;
     bool dumpFound = false;
+    bool dumpValid = false;
     bool reportValid = false;
     int captureAttempts = 0;
     std::string report;
+    std::string dumpError = "dump is missing";
+    std::string validDumpPath;
     for(; captureAttempts < captureAttemptsMaximum; ++captureAttempts)
     {
-        dumpFound = false;
-        error.clear();
-        for(const auto & entry : std::filesystem::directory_iterator(directory, error))
-        {
-            if(entry.path().extension() == ".dmp" && entry.file_size(error) > 0)
-                dumpFound = true;
-        }
-
         report.clear();
         reportValid = Systems::readFile2String(
             (directory / "crash-report.log").string(), report) &&
             report.find("[FATAL WINDOWS EXCEPTION]") != std::string::npos &&
             report.find("code=0xC0000005") != std::string::npos &&
-            report.find("status=written") != std::string::npos;
+            report.find("status=written error=0") != std::string::npos;
 
-        if(dumpFound && reportValid) break;
+        dumpFound = false;
+        dumpValid = false;
+        error.clear();
+        for(const auto & entry : std::filesystem::directory_iterator(directory, error))
+        {
+            if(entry.path().extension() != ".dmp" || !entry.file_size(error)) continue;
+            dumpFound = true;
+            if(validateWindowsCrashDump(entry.path().string(), process.dwThreadId, report, dumpError))
+            {
+                dumpValid = true;
+                validDumpPath = entry.path().string();
+            }
+        }
+
+        if(dumpValid && reportValid) break;
         if(captureAttempts + 1 < captureAttemptsMaximum) Sleep(captureRetryDelayMs);
     }
 
-    if(waitResult != WAIT_OBJECT_0 || exitCode == 0 || !dumpFound || !reportValid)
+    if(waitResult != WAIT_OBJECT_0 || exitCode != EXCEPTION_ACCESS_VIOLATION || !dumpValid || !reportValid)
     {
         std::cerr << "FAIL: Windows native crash capture is incomplete"
                   << ", wait=" << waitResult << ", exit=" << exitCode
                   << ", dump=" << dumpFound << ", report=" << reportValid
+                  << ", dump_valid=" << dumpValid << ", dump_error=" << dumpError
                   << ", attempts=" << std::min(captureAttempts + 1, captureAttemptsMaximum)
                   << ", report_bytes=" << report.size() << '\n';
         std::cerr << "Crash report contents:\n" << report << '\n';
+        return 1;
+    }
+
+    // A nonempty file with a correct signature still must not pass when its
+    // stream directory points beyond the captured bytes.
+    auto malformed = Systems::readFile(validDumpPath);
+    MINIDUMP_HEADER malformedHeader = {};
+    if(malformed.size() < sizeof(malformedHeader))
+    {
+        std::cerr << "FAIL: native dump could not be reread for corruption validation\n";
+        return 1;
+    }
+    std::memcpy(&malformedHeader, malformed.data(), sizeof(malformedHeader));
+    malformedHeader.StreamDirectoryRva = static_cast<RVA>(malformed.size() - 1);
+    std::memcpy(malformed.data(), &malformedHeader, sizeof(malformedHeader));
+    const std::string malformedPath = (directory / "corrupt-native-fixture.bin").string();
+    std::string malformedError;
+    const bool malformedRejected = Systems::saveFile(malformed, malformedPath) &&
+        !validateWindowsCrashDump(malformedPath, process.dwThreadId, report, malformedError) &&
+        malformedError == "dump header or stream directory is invalid";
+    std::filesystem::remove(malformedPath, error);
+    if(!malformedRejected)
+    {
+        std::cerr << "FAIL: native dump validation did not reject a corrupted stream directory\n";
         return 1;
     }
 
@@ -5632,7 +5769,18 @@ int main(int argc, char** argv)
     if(1 < argc && std::string(argv[1]) == "--windows-crash-report-child")
     {
         CrashReport::install("four-winds-reborn-native-test");
-        RaiseException(EXCEPTION_ACCESS_VIOLATION, EXCEPTION_NONCONTINUABLE, 0, nullptr);
+        // Exercise a real OS exception record, including the write operation
+        // and inaccessible address, instead of synthesizing an incomplete AV.
+        auto* inaccessible = static_cast<volatile unsigned char*>(
+            VirtualAlloc(nullptr, 1, MEM_RESERVE | MEM_COMMIT, PAGE_NOACCESS));
+        if(!inaccessible)
+        {
+            std::cerr << "FAIL: native crash test protected allocation failed: " << GetLastError() << '\n';
+            return 2;
+        }
+        CrashReport::breadcrumb("native crash test write-address=" +
+            std::to_string(reinterpret_cast<std::uintptr_t>(inaccessible)));
+        *inaccessible = 1;
         return 2;
     }
 

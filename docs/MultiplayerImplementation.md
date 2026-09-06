@@ -106,6 +106,22 @@ The affected local checks pass 21/21, with another five consecutive protocol
 runs passing and an invalid matrix selector rejected explicitly. These
 follow-ups change tests only; the protocol-2 review binaries remain valid.
 
+CI `16b82c9` then passed the protocol, all twenty matrix cases and all network
+matches on every platform. The remaining macOS Debug transport failure was
+reproduced by delivering the first byte after the fixture's initial empty poll.
+A read-only partial-frame byte count now lets header/payload deadline tests
+start measuring after confirmed receipt; transport deadlines are unchanged.
+Windows Release again reported DbgHelp error `0x800706F8`. Its fixture now
+causes an actual write to a protected page and validates the dump's exception,
+register context and stack, including rejection of a corrupted stream directory.
+The former synthetic AV supplied none of the operation/address fields described
+in the [Windows exception-record contract](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-exception_record).
+Ten local real-AV captures pass. This does not establish the cause of the runner's
+DbgHelp error; the production reporter remains unchanged, and CI now retains
+its test-generated dump files if further investigation is needed. The focused
+TCP, TLS and native-crash checks pass 3/3. An isolated transport mutation that
+incorrectly refreshes the header timer is rejected by the updated deadline test.
+
 The direct Internet route uses a reachable host IPv4/port or shared VPN; there
 is no public relay or matchmaking service. See the
 [play guide](MultiplayerPlayGuide.md) for exact setup and in-memory reconnect

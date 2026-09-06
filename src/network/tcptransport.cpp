@@ -401,6 +401,8 @@ bool TcpConnection::receive(std::string & payload)
     return true;
 }
 
+std::size_t TcpConnection::partialFrameBytes() const
+{ return impl ? impl->headerBytes + impl->partial.size() : 0; }
 bool TcpConnection::connected() const { return impl && impl->socket != InvalidSocket && !impl->pending; }
 bool TcpConnection::connecting() const { return impl && impl->pending; }
 bool TcpConnection::closed() const { return !impl || impl->socket == InvalidSocket; }

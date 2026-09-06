@@ -163,6 +163,7 @@ jobs:
           path: |
             build-windows/Testing/Temporary/**
             build-windows/diagnostics-native-test/crash-report.log
+            build-windows/diagnostics-native-test/*.dmp
           if-no-files-found: warn
           retention-days: 14
 

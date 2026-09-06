@@ -54,6 +54,9 @@ namespace Multiplayer
         void poll();
         bool send(const std::string & payload, std::string & error);
         bool receive(std::string & payload);
+        // Read-only diagnostic: received header/payload bytes of the current
+        // incomplete frame, excluding already completed queued messages.
+        std::size_t partialFrameBytes() const;
         bool connected() const;
         bool connecting() const;
         bool closed() const;

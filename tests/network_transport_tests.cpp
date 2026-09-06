@@ -6,6 +6,7 @@
 #include <ws2tcpip.h>
 #else
 #include <arpa/inet.h>
+#include <netinet/tcp.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #endif
@@ -100,6 +101,10 @@ namespace
             address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
             require(::connect(socket, reinterpret_cast<sockaddr *>(&address), sizeof(address)) == 0,
                     "Raw loopback connect failed");
+            const int noDelay = 1;
+            require(setsockopt(socket, IPPROTO_TCP, TCP_NODELAY,
+                               reinterpret_cast<const char *>(&noDelay), sizeof(noDelay)) == 0,
+                    "Raw socket TCP_NODELAY failed");
         }
         ~RawPeer() { close(); }
         RawPeer(const RawPeer &) = delete;
@@ -256,7 +261,6 @@ namespace
     void testEofAndDeadlines()
     {
         TcpLimits limits;
-        limits.frameTimeout = std::chrono::milliseconds(35);
         TcpListener listener(limits);
         std::string error, message;
         require(listener.listen(0, error), error);
@@ -278,21 +282,50 @@ namespace
             require(!server->receive(message), "Truncated frame was delivered");
             require(server->error().find("during a frame") != std::string::npos, "Truncation diagnostic missing");
         }
+        for(const bool payloadDrip : {false, true})
         {
-            RawPeer raw(listener.port());
-            auto server = accept(listener);
-            raw.send(std::string(1, '\0'));
+            TcpLimits dripLimits;
+            dripLimits.frameTimeout = std::chrono::milliseconds(35);
+            TcpListener dripListener(dripLimits);
+            require(dripListener.listen(0, error), error);
+            RawPeer raw(dripListener.port());
+            auto server = accept(dripListener);
+            // Prove that an empty early poll does not establish the timer.
+            // The first byte can reach a loopback socket only on a later poll.
             server->poll();
-            std::this_thread::sleep_for(std::chrono::milliseconds(20));
-            raw.send(std::string(1, '\0'));
+            require(server->partialFrameBytes() == 0, "Idle connection reported a partial frame");
+            const std::string first = payloadDrip ? framed(std::string(64, 'x')).substr(0, 5) : std::string(1, '\0');
+            raw.send(first);
+            eventually([&]
+            {
+                server->poll();
+                require(!server->closed(), "Connection closed before its first partial frame was observed");
+                return server->partialFrameBytes() == first.size();
+            }, "First partial frame bytes did not reach the receiver");
+            const auto receivedAt = Clock::now();
+            std::this_thread::sleep_until(receivedAt + std::chrono::milliseconds(20));
             server->poll();
-            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            // A loaded runner may already overshoot the complete deadline.
+            // That is a valid timeout, and we must not write to its closed peer.
+            if(!server->closed())
+            {
+                raw.send(std::string(1, payloadDrip ? 'y' : '\0'));
+                eventually([&]
+                {
+                    server->poll();
+                    return server->closed() || server->partialFrameBytes() == first.size() + 1;
+                }, "Later partial frame byte did not reach the receiver");
+            }
+            std::this_thread::sleep_until(receivedAt + dripLimits.frameTimeout + std::chrono::milliseconds(5));
             server->poll();
             require(server->closed() && server->error().find("timed out") != std::string::npos,
-                    "Slow header drip extended the frame deadline");
+                    payloadDrip ? "Slow payload drip extended the frame deadline" :
+                                  "Slow header drip extended the frame deadline");
         }
         limits.writeTimeout = std::chrono::milliseconds(15);
         Pair pair(limits);
+        // Unlike receive(), send() starts the queued-write deadline
+        // synchronously, so no socket-delivery observation is needed here.
         require(pair.client.send("{}", error), error);
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
         pair.client.poll();
