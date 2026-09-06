@@ -50,6 +50,9 @@ requires an automatic reconnect, then verifies the same final scores/revision.
 The final 12 offline tests pass; the full cohort gate in
 `diagnostics/multiplayer-gate-20260906` passes 52 matches and 14 byte-identical
 CSV contracts. Russian Reborn UI rendering also passes after final layout fixes.
+Authority coverage additionally completes Classic Duel through East, South,
+West and North: eight Rune deals, eight island phases, all human summary
+barriers and final standings, without starting an extra deal.
 
 Recipient-view tests cover private hands, Scry, invisible creatures, final unit
 scores and atomic malformed-input rejection. Session tests cover concurrent
@@ -72,6 +75,21 @@ is no public relay or matchmaking service. See the
 limits. Cross-platform CI, final matrix and package evidence must be recorded
 before declaring the goal complete. A two-device Android lifecycle test and an
 actual route between separate Internet networks remain manual acceptance items.
+
+## Review builds
+
+The tested gameplay implementation is commit `b20863a` on `develop`. Local
+review artifacts are stamped with that commit; later workflow/test-only
+follow-ups do not change their game code.
+
+- Windows: `dist/windows-v0.6.0-dev-network/four-winds-reborn.exe` (keep its
+  sibling DLLs and `themes` directory).
+- Android: `dist/android/four-winds-reborn-v0.6.0-dev-network-android-arm64-debug.apk`.
+- Windows EXE SHA256: `4409d79c109a7dce10c68b21f6d00f3f722041022eb4d3ea42e3692aa232a73d`.
+- Android APK SHA256: `734cd8e72e58de228636e84e419d0b1b745bcf52d2c1e9cd379a3c2cfc49e168`.
+
+The accepted v0.5.0 local artifacts remain in their original locations. No
+GitHub Release or multiplayer release tag has been created.
 
 The network modules live under `src/network`. Transport handles bytes only;
 all GameData access stays on the SDL/UI thread. Scene-level polling continues

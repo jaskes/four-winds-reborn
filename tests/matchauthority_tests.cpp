@@ -2,6 +2,7 @@
 #include <iostream>
 #include <set>
 #include <string>
+#include <vector>
 
 #include "battlesession.h"
 #include "clientview.h"
@@ -20,6 +21,7 @@ namespace GameData
     extern Stone dropStone;
     extern Wind currentWind;
     extern Wind roundWind;
+    extern Wind partWind;
     extern WinResults winResult;
     extern std::vector<LandInfo> landsInfo;
 }
@@ -131,61 +133,120 @@ int runMatchAuthorityTests()
 
     // Both humans finish complete real deals through the same authority API
     // used by sockets; no client calls a game initializer or the game pump.
-    int runePhases = 1;
-    int adventurePhases = 0;
-    int previousPhase = authority.phase();
-    for(int step = 0; step < 6000 && authority.phase() != Menu::GameSummaryPart; ++step)
+    for(const bool classic : {false, true})
     {
-        const int phase = authority.phase();
-        if(phase == Menu::MahjongSummaryPart || phase == Menu::BattleSummaryPart)
+        const std::string label = classic ? "Classic" : "Quick";
+        if(classic)
         {
-            const Avatar firstReady = config.players[step % 2].avatar;
-            const Avatar secondReady = config.players[(step + 1) % 2].avatar;
-            check(authority.ready(firstReady), "first human acknowledges phase summary");
-            check(authority.phase() == phase && !authority.tick(), "slow human keeps summary visible for both clients");
-            check(authority.ready(secondReady), "second human releases phase summary barrier");
+            auto classicConfig = duelConfig(606002);
+            classicConfig.rulesetId = ClassicRuneGameRulesetId;
+            classicConfig.rulesetVersion = ClassicRuneGameRulesetVersion;
+            check(authority.start(classicConfig, &error), "start Classic human Duel: " + error);
+            if(!authority.active()) break;
+            for(const Person& person : classicConfig.players)
+                check(authority.ready(person.avatar), "human acknowledges Classic roster");
+            check(activeRuneGameRuleset().id() == ClassicRuneGameRulesetId &&
+                  std::none_of(GameData::players().begin(), GameData::players().end(), [](const LocalPlayer& player) {
+                      return GameData::usesAI(player);
+                  }), "Classic authority starts with two human controllers");
         }
-        else if(phase == Menu::MahjongPart)
+        int runePhases = 1;
+        int adventurePhases = 0;
+        int runeSummaries = 0;
+        int battleSummaries = 0;
+        int previousPhase = authority.phase();
+        std::vector<int> runeRounds{GameData::roundWind()};
+        std::vector<int> runeParts{GameData::partWind()};
+        std::vector<int> adventureRounds;
+        for(int step = 0; step < 6000 && authority.phase() != Menu::GameSummaryPart; ++step)
         {
-            authority.tick();
-            if(authority.phase() != Menu::MahjongPart) continue;
-            if(GameData::dropStone.isValid())
+            const int phase = authority.phase();
+            if(phase == Menu::MahjongSummaryPart || phase == Menu::BattleSummaryPart)
             {
-                for(const Person& person : config.players)
-                    if(authority.awaitingClaim(person.avatar))
-                        check(authority.submit(person.avatar, ClientButtonPass()), "human passes discard during full match");
+                if(phase == Menu::MahjongSummaryPart) ++runeSummaries;
+                else ++battleSummaries;
+                const Avatar firstReady = config.players[step % 2].avatar;
+                const Avatar secondReady = config.players[(step + 1) % 2].avatar;
+                check(authority.ready(firstReady), label + " first human acknowledges phase summary");
+                check(authority.phase() == phase && !authority.tick(), label + " slow human keeps summary visible for both clients");
+                check(authority.ready(secondReady), label + " second human releases phase summary barrier");
             }
-            else
+            else if(phase == Menu::MahjongPart)
             {
-                const LocalPlayer* current = GameData::players().playerOfAvatar(GameData::currentPerson().avatar);
-                if(GameData::croupier.hasLuckDraw())
-                    check(authority.submit(current->avatar, ClientLuckChoice(0)), "human chooses Luck rune during full match");
-                else if(current->newStone.isValid())
-                    check(authority.submit(current->avatar, ClientDropIndex(static_cast<int>(current->stones.size()))),
-                          "human discards during full match");
+                authority.tick();
+                if(authority.phase() != Menu::MahjongPart) continue;
+                if(GameData::dropStone.isValid())
+                {
+                    for(const Person& person : config.players)
+                        if(authority.awaitingClaim(person.avatar))
+                            check(authority.submit(person.avatar, ClientButtonPass()), label + " human passes discard during full match");
+                }
+                else
+                {
+                    const LocalPlayer* current = GameData::players().playerOfAvatar(GameData::currentPerson().avatar);
+                    if(GameData::croupier.hasLuckDraw())
+                        check(authority.submit(current->avatar, ClientLuckChoice(0)), label + " human chooses Luck rune during full match");
+                    else if(current->newStone.isValid())
+                        check(authority.submit(current->avatar, ClientDropIndex(static_cast<int>(current->stones.size()))),
+                              label + " human discards during full match");
+                }
             }
-        }
-        else if(phase == Menu::AdventurePart)
-        {
-            authority.tick();
-            if(authority.phase() == Menu::AdventurePart)
+            else if(phase == Menu::AdventurePart)
             {
-                const LocalPlayer* current = GameData::players().playerOfAvatar(GameData::currentPerson().avatar);
-                if(!current->adventurePartDone()) check(authority.submit(current->avatar, ClientBattleReady()), "human finishes island turn");
+                authority.tick();
+                if(authority.phase() == Menu::AdventurePart)
+                {
+                    const LocalPlayer* current = GameData::players().playerOfAvatar(GameData::currentPerson().avatar);
+                    if(!current->adventurePartDone())
+                        check(authority.submit(current->avatar, ClientBattleReady()), label + " human finishes island turn");
+                }
             }
+            const int now = authority.phase();
+            if(now != previousPhase)
+            {
+                if(now == Menu::MahjongPart)
+                {
+                    ++runePhases;
+                    runeRounds.push_back(GameData::roundWind());
+                    runeParts.push_back(GameData::partWind());
+                }
+                if(now == Menu::AdventurePart)
+                {
+                    ++adventurePhases;
+                    adventureRounds.push_back(GameData::roundWind());
+                }
+                previousPhase = now;
+            }
+            for(const Person& person : config.players) authority.takeEvents(person.avatar);
         }
-        const int now = authority.phase();
-        if(now != previousPhase)
+        const int expectedDeals = classic ? 8 : 2;
+        const std::vector<int> expectedRounds = classic ?
+            std::vector<int>{Wind::East, Wind::East, Wind::South, Wind::South, Wind::West, Wind::West, Wind::North, Wind::North} :
+            std::vector<int>{Wind::East, Wind::East};
+        std::vector<int> expectedParts;
+        for(int index = 0; index < expectedDeals; ++index) expectedParts.push_back(index % 2 ? Wind::West : Wind::East);
+        check(authority.phase() == Menu::GameSummaryPart && runePhases == expectedDeals && adventurePhases == expectedDeals &&
+              runeSummaries == expectedDeals && battleSummaries == expectedDeals,
+              label + " human Duel finishes every Rune/island phase and both summary barriers");
+        check(runeRounds == expectedRounds && adventureRounds == expectedRounds && runeParts == expectedParts,
+              label + " human Duel visits each configured round in order and deals once per active seat");
+        const auto standings = MatchScore::current();
+        check(standings.size() == 2 && !MatchScore::winnerIndices(standings).empty(),
+              label + " final standings contain both players and a winner");
+        for(const Person& person : config.players)
         {
-            if(now == Menu::MahjongPart) ++runePhases;
-            if(now == Menu::AdventurePart) ++adventurePhases;
-            previousPhase = now;
+            const auto result = std::find_if(standings.begin(), standings.end(), [&](const MatchScore::PlayerResult& entry) {
+                return entry.person.avatar == person.avatar;
+            });
+            check(result != standings.end() && result->totalScore > 0 && result->finalRank >= 1 && result->finalRank <= 2 &&
+                  result->teamScore == result->totalScore,
+                  label + " each human receives a valid individual final standing");
         }
-        for(const Person& person : config.players) authority.takeEvents(person.avatar);
+        const auto finalRevision = authority.revision();
+        check(!authority.tick() && authority.revision() == finalRevision && authority.phase() == Menu::GameSummaryPart,
+              label + " final standings remain stable instead of starting an extra deal");
+        authority.stop();
     }
-    check(authority.phase() == Menu::GameSummaryPart && runePhases == 2 && adventurePhases == 2,
-          "Quick human Duel reaches final score after two Rune and two island phases");
-    authority.stop();
 
     // The host must collect competing claims. Arrival order cannot turn a
     // lower-priority Pung into a win over another human's Game declaration.
