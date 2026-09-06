@@ -158,7 +158,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: test-logs-windows-x64-${{ matrix.build_type }}
-          path: build-windows/Testing/Temporary/**
+          path: |
+            build-windows/Testing/Temporary/**
+            build-windows/diagnostics-native-test/crash-report.log
           if-no-files-found: warn
           retention-days: 14
 

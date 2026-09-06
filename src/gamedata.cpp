@@ -372,11 +372,10 @@ namespace GameData
             player.points += spellPoints;
             if(!initial && rules.mahjongPartAiLandClaimBonus > 0)
             {
-                for(const auto clanId : clans_all)
+                for(const LocalPlayer & opponent : gamers)
                 {
-                    const Clan clan(clanId);
-                    if(!allied(clan, player.clan))
-                        player.addLandClaimPoints(clan, rules.mahjongPartAiLandClaimBonus);
+                    if(!allied(opponent.clan, player.clan))
+                        player.addLandClaimPoints(opponent.clan, rules.mahjongPartAiLandClaimBonus);
                 }
             }
         }
@@ -879,6 +878,22 @@ bool GameData::initMahjong(void)
 
 bool GameData::initMahjong(const RuneGameRuleset & ruleset)
 {
+    RuneGameRoundAdvance advance = ruleset.advanceRound(roundWind(), partWind());
+    if(activeMatchTopology().seatCount() == 2 && partWind.isValid())
+    {
+        // A round deals once per active seat. Keep the ruleset's round limit,
+        // including Quick's East-only limit, without inventing empty hands.
+        if(partWind == Wind(Wind::East))
+        {
+            advance.partWindId = Wind::West;
+            advance.rotatePlayerWinds = true;
+        }
+        else
+            advance = ruleset.advanceRound(roundWind(), Wind::North);
+    }
+    if(advance.complete)
+        return false;
+
     pendingBattle = PendingBattle();
     do
     {
@@ -897,22 +912,6 @@ bool GameData::initMahjong(const RuneGameRuleset & ruleset)
     skipNewStone = false;
     skipNewTurn = false;
     stateGUI.clear();
-
-    RuneGameRoundAdvance advance = ruleset.advanceRound(roundWind(), partWind());
-    if(activeMatchTopology().seatCount() == 2 && partWind.isValid())
-    {
-        // A round deals once per active seat. Keep the ruleset's round limit,
-        // including Quick's East-only limit, without inventing empty hands.
-        if(partWind == Wind(Wind::East))
-        {
-            advance.partWindId = Wind::West;
-            advance.rotatePlayerWinds = true;
-        }
-        else
-            advance = ruleset.advanceRound(roundWind(), Wind::North);
-    }
-    if(advance.complete)
-        return false;
 
     if(advance.rotatePlayerWinds)
         gamers.shiftWinds();

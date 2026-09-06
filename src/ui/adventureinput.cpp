@@ -552,9 +552,9 @@ bool AdventurePartScreen::actionDebugCommandParty(void)
 {
     if(debugLand.isTowerWinds())
     {
-        for(auto clan : clans_all)
+        for(const auto & player : GameData::players())
         {
-            BattleArmy & army = GameData::getBattleArmy(clan);
+            const BattleArmy & army = player.army;
             const BattleParty* party = army.findPartyConst(debugLand);
 
             if(party)

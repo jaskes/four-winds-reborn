@@ -38,6 +38,8 @@ MatchScore::PlayerInput MatchScore::observe(const RemotePlayer & player)
     for(const auto clanId : clans_all)
     {
         const Clan clan(clanId);
+        if(activeMatchTopology().seatCount() == 2 && !GameData::players().playerOfClan(clan))
+            continue;
         if(clan != player.clan && !GameData::allied(clan, player.clan))
             input.scores[index(Category::LandClaims)] +=
                 std::max(0, player.landClaimPoints(clan));

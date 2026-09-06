@@ -3852,6 +3852,18 @@ void testAdventureBattleSessionFlow()
            GameData::authoritativeState().getObject("battleSession") != nullptr,
            "authoritative save/load must preserve a pending Adventure battle");
 
+    JsonObject brokenBattleState = pendingState;
+    JsonObject brokenBattle = *pendingState.getObject("battleSession");
+    JsonObject brokenSession = *brokenBattle.getObject("session");
+    brokenSession.addString("phase", "unknown-phase");
+    brokenBattle.addObject("session", brokenSession);
+    brokenBattleState.addObject("battleSession", brokenBattle);
+    const std::string beforeBrokenBattle = Recovery::stateHash(GameData::authoritativeState());
+    expect(!Recovery::validateSaveState(brokenBattleState) &&
+           !GameData::restoreState(brokenBattleState) &&
+           Recovery::stateHash(GameData::authoritativeState()) == beforeBrokenBattle,
+           "unknown saved battle phase must be rejected without losing the active battle");
+
     const std::string beforeInvalidChoice = GameData::authoritativeState().toString();
     ActionList rejected;
     ActionRejection battleRejection;
@@ -4402,6 +4414,7 @@ int runWindowsCrashReportSelfTest(const char* executable)
                   << ", dump=" << dumpFound << ", report=" << reportValid
                   << ", attempts=" << std::min(captureAttempts + 1, captureAttemptsMaximum)
                   << ", report_bytes=" << report.size() << '\n';
+        std::cerr << "Crash report contents:\n" << report << '\n';
         return 1;
     }
 
@@ -5600,6 +5613,8 @@ int runBalanceReplayVerification(int argc, char** argv)
 }
 
 int runLocalModesUiTests(const char* program);
+int runStateIntegrityTests();
+int runMatchModeMatrixTests();
 
 int main(int argc, char** argv)
 {
@@ -5840,6 +5855,12 @@ int main(int argc, char** argv)
 
     if(1 < argc && std::string(argv[1]) == "--recovery-self-test")
         return runRecoverySelfTest();
+
+    if(1 < argc && std::string(argv[1]) == "--state-integrity-self-test")
+        return runStateIntegrityTests();
+
+    if(1 < argc && std::string(argv[1]) == "--match-mode-matrix-self-test")
+        return runMatchModeMatrixTests();
 
     if(1 < argc && std::string(argv[1]) == "--settings-self-test")
         return runSettingsPersistenceSelfTest();

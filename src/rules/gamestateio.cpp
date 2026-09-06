@@ -102,6 +102,7 @@ namespace GameData
     }
     extern JsonObject                   stateGUI;
     extern std::vector<LandInfo>        landsInfo;
+    extern std::vector<Clan>            initialLandOwners;
 
     const char* recoveryPlatform(void)
     {
@@ -241,6 +242,44 @@ namespace GameData
             return false;
         }
 
+        // Decode everything before committing. A failed load must leave the
+        // previous game and its command/undo state usable.
+        CroupierSet loadedCroupier = CroupierSet::fromJsonObject(*jo.getObject("croupier"));
+        WinResults loadedWinResult = WinResults::fromJsonObject(*jo.getObject("winresult"));
+        std::list<BattleLegend> loadedHistory;
+        const JsonArray* history = jo.getArray("history");
+        for(std::size_t index = 0; index < history->size(); ++index)
+            loadedHistory.push_back(BattleLegend::fromJsonObject(*history->getObject(index)));
+
+        PendingBattle loadedBattle;
+        if(const JsonObject* battle = jo.getObject("battleSession"))
+            loadedBattle = PendingBattle::fromJsonObject(*battle);
+
+        JsonObject loadedGUI;
+        if(const JsonObject* gui = jo.getObject("gui")) loadedGUI = *gui;
+
+        // Saves predating persisted captures start from the theme's map, not
+        // ownership left behind by a previous match (possibly a Duel).
+        std::vector<Clan> loadedOwners = initialLandOwners;
+        if(const JsonObject* owners = jo.getObject("landOwners"))
+        {
+            for(const auto landId : lands_all)
+            {
+                const Land land(landId);
+                if(!land.isTowerWinds() && owners->hasKey(land.toString()))
+                    loadedOwners[land()] = Clan(owners->getString(land.toString()));
+            }
+        }
+
+        // All possible validation failures precede the first live mutation.
+        if(const JsonObject* rng = jo.getObject("gameplayRng"))
+        {
+            if(!GameplayRng::fromJsonObject(*rng)) return false;
+        }
+        else GameplayRng::seedFromEntropy();
+
+        selectActiveRuneGameRuleset(loadedRuleset.id, loadedRuleset.version);
+        selectActiveMatchTopology(loadedTopology.id, loadedTopology.version);
         VERBOSE("load gamedata, version: " << version);
 
         stoneLastCount = jo.getInteger("lastcount");
@@ -259,102 +298,16 @@ namespace GameData
         developerAutoplayAvatar = Avatar();
 #endif
 
-        const JsonObject* jo2 = nullptr;
-
         person = loadedPerson;
-
-        jo2 = jo.getObject("croupier");
-        if(! jo2)
-        {
-            ERROR("json parse: " << "croupier");
-            return false;
-        }
-        croupier = CroupierSet::fromJsonObject(*jo2);
-
-        jo2 = jo.getObject("winresult");
-        if(! jo2)
-        {
-            ERROR("json parse: " << "winresult");
-            return false;
-        }
-        winResult = WinResults::fromJsonObject(*jo2);
-
-        const JsonArray* ja2 = nullptr;
-
+        croupier = std::move(loadedCroupier);
+        winResult = std::move(loadedWinResult);
         gamers = std::move(loadedGamers);
         resetAdventureCommandState();
-        pendingBattle = PendingBattle();
-
-        // Older saves did not persist captured territory owners and keep theme defaults.
-        jo2 = jo.getObject("landOwners");
-        if(jo2)
-        {
-            for(auto landId : lands_all)
-            {
-                const Land land(landId);
-                const Clan owner(jo2->getString(land.toString(), landInfo(land).clan.toString()));
-                if(!land.isTowerWinds() && owner.isValid()) landsInfo[land()].clan = owner;
-            }
-        }
-
-        battleHistory.clear();
-
-        ja2 = jo.getArray("history");
-        if(! ja2)
-        {
-            ERROR("json parse: " << "history");
-            return false;
-        }
-
-        for(int it = 0; it < ja2->size(); ++it)
-        {
-            jo2 = ja2->getObject(it);
-            if(jo2) battleHistory.push_back(BattleLegend::fromJsonObject(*jo2));
-        }
-
-        jo2 = jo.getObject("battleSession");
-        if(jo2)
-        {
-            pendingBattle = PendingBattle::fromJsonObject(*jo2);
-            if(!pendingBattle.isValid())
-            {
-                ERROR("invalid pending battle session");
-                return false;
-            }
-        }
-
-        stateGUI.clear();
-
-        jo2 = jo.getObject("gui");
-        if(jo2) stateGUI = *jo2;
-
-        const JsonObject* rng = jo.getObject("gameplayRng");
-        if(rng)
-        {
-            if(!GameplayRng::fromJsonObject(*rng))
-            {
-                ERROR("unsupported or invalid gameplay RNG state");
-                return false;
-            }
-        }
-        else
-        {
-            // Compatibility for saves created before deterministic gameplay RNG.
-            GameplayRng::seedFromEntropy();
-        }
-
-        if(!selectActiveRuneGameRuleset(loadedRuleset.id, loadedRuleset.version,
-                                        &validationError))
-        {
-            ERROR("invalid saved game: " << validationError);
-            return false;
-        }
-        if(!selectActiveMatchTopology(loadedTopology.id, loadedTopology.version,
-                                      &validationError))
-        {
-            ERROR("invalid saved game: " << validationError);
-            return false;
-        }
+        pendingBattle = std::move(loadedBattle);
+        for(std::size_t index = 0; index < loadedOwners.size(); ++index)
+            landsInfo[index].clan = loadedOwners[index];
+        battleHistory = std::move(loadedHistory);
+        stateGUI = std::move(loadedGUI);
 
         return true;
     }

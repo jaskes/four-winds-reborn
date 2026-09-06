@@ -270,6 +270,7 @@ if(BUILD_TESTING AND NOT ANDROID)
         tests/gameplay_regression_tests.cpp
         tests/avatar_balance_tests.cpp
         tests/local_modes_ui_tests.cpp
+        tests/state_integrity_tests.cpp
         src/ai/tournament.cpp
         ${FOUR_WINDS_SOURCE})
     target_compile_definitions(gameplay_regression_tests PRIVATE
@@ -282,6 +283,14 @@ if(BUILD_TESTING AND NOT ANDROID)
     endif()
     add_test(NAME gameplay_regressions COMMAND gameplay_regression_tests)
     add_test(NAME local_modes_ui COMMAND gameplay_regression_tests --local-modes-ui-self-test)
+    add_test(NAME state_integrity COMMAND gameplay_regression_tests --state-integrity-self-test)
+    add_test(NAME match_mode_matrix COMMAND gameplay_regression_tests --match-mode-matrix-self-test)
+    set_tests_properties(match_mode_matrix PROPERTIES
+        TIMEOUT 240
+        ENVIRONMENT "FOUR_WINDS_RECOVERY_DIR=${CMAKE_BINARY_DIR}/match-mode-matrix/recovery;FOUR_WINDS_SAVE_DIR=${CMAKE_BINARY_DIR}/match-mode-matrix/saves")
+    set_tests_properties(state_integrity PROPERTIES
+        TIMEOUT 90
+        ENVIRONMENT "FOUR_WINDS_RECOVERY_DIR=${CMAKE_BINARY_DIR}/state-integrity/recovery;FOUR_WINDS_SAVE_DIR=${CMAKE_BINARY_DIR}/state-integrity/saves")
     set_tests_properties(local_modes_ui PROPERTIES
         TIMEOUT 90
         ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy;SDL_RENDER_DRIVER=software;FOUR_WINDS_SETTINGS_FILE=${CMAKE_BINARY_DIR}/local-modes-ui/settings.json;FOUR_WINDS_RECOVERY_DIR=${CMAKE_BINARY_DIR}/local-modes-ui/recovery;FOUR_WINDS_SAVE_DIR=${CMAKE_BINARY_DIR}/local-modes-ui/saves")

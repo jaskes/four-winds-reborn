@@ -38,6 +38,14 @@ Reborn work only; they do not claim authorship of inherited code or assets.
   button when Adventure control moved to the second local clan.
 - Reset original land owners when starting a four-player game after a Duel.
 - Added native rendered UI regressions and full two-player match/replay checks.
+- Rejected damaged saves before changing the live match or replacing a valid
+  autosave; validate RNG and pending battle phases during save inspection.
+- Restored original island ownership when loading saves predating persisted
+  captures, including after a two-player Duel.
+- Restricted Unfair AI land-claim income and Duel scoring to participating clans.
+- Kept the completed match intact when a request for another hand is refused.
+- Updated developer final-round fixtures and island inspection for Quick and
+  two-player Duel; added state integrity and mode/difficulty replay matrices.
 
 ### Changed - topology-aware gameplay
 

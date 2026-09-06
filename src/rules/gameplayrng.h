@@ -21,6 +21,7 @@ namespace GameplayRng
     int uniform(int minimum, int maximum);
 
     SWE::JsonObject toJsonObject(void);
+    bool isValidState(const SWE::JsonObject & value);
     bool fromJsonObject(const SWE::JsonObject & value);
 
     template<typename InputIterator>
