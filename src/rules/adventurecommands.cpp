@@ -19,6 +19,7 @@
 #include "battlesession.h"
 #include "crashreport.h"
 #include "replay.h"
+#include "matchtopology.h"
 
 namespace
 {
@@ -91,8 +92,9 @@ bool GameData::adventure2Client(const Avatar & avatar, ActionList & actions)
         if(gamePart == Menu::AdventurePart)
         {
             if(!adventureBattleAction(player.avatar, actions)) return true;
-            if(currentWind() == Wind::North) gamePart = Menu::BattleSummaryPart;
-            currentWind.shift();
+            if(currentWind() == activeMatchTopology().winds().back()) gamePart = Menu::BattleSummaryPart;
+            currentWind = Wind(activeMatchTopology().nextWind(currentWind()));
+            skipRepeatSay = false;
         }
         else
         {

@@ -17,14 +17,27 @@ Reborn work only; they do not claim authorship of inherited code or assets.
 
 - Added a versioned match-topology contract independent from Rune Game rules,
   persisted in saves, recovery checkpoints, replays and simulation artifacts.
-- Added the Quick ruleset, which plays only the East round while preserving
-  the existing four winds, hands and clan identities.
-- Added hot-seat Duel: Red and Purple share one local controller, while Yellow
-  and Aqua share the other. Both hands remain distinct and switch
-  automatically during the Rune Game.
+- Added the Quick ruleset, which plays only the East round: four hands in
+  Classic/Coalition, or two hands in Duel.
+- Added two-player Duel (`duel@2`): one local player against one AI, one hand
+  each, opposite East/West seats, and half of the island owned by each wizard.
+  Classic-length Duel plays eight hands across four rounds. The first
+  four-hand implementation (`duel@1`) remains available for existing saves.
 - Added Coalition: four controllers remain active, with fixed Red/Purple and
   Yellow/Aqua teams sharing score and victory.
 - Added localized Match Mode and Rune Game Rules selectors to Settings.
+- Added two-player rosters, rune table, island status and summaries, plus
+  colour-coded Coalition teams and a shared final score for each team.
+
+### Fixed - candidate review
+
+- Fixed clipped setting values in the compact menu and clarified that
+  Continue preserves the saved match mode.
+- Fixed loss of the selected rune after continuing a legacy Duel's second
+  hand, automatic Pass that skipped that hand's claim, and a disabled Done
+  button when Adventure control moved to the second local clan.
+- Reset original land owners when starting a four-player game after a Duel.
+- Added native rendered UI regressions and full two-player match/replay checks.
 
 ### Changed - topology-aware gameplay
 

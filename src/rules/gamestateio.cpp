@@ -233,7 +233,9 @@ namespace GameData
                 matchingLocalPlayer = true;
         }
 
-        if(loadedGamers.size() != 4 || !rosterIsValid || !matchingLocalPlayer)
+        if(loadedGamers.size() != static_cast<std::size_t>(
+               findMatchTopology(loadedTopology.id, loadedTopology.version)->seatCount()) ||
+           !rosterIsValid || !matchingLocalPlayer)
         {
             ERROR("invalid saved game: player roster is incomplete or inconsistent");
             return false;

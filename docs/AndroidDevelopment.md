@@ -91,6 +91,8 @@ exact APK on a physical device:
 8. Kill the app from Android recents, relaunch and use Continue.
 9. Start Quick, Duel and Coalition games and verify small selectors, Pass and
    compact Rune Game action buttons remain comfortable and accurate to tap.
+   A new Duel must show two players, one hand each and 22 starting towns per
+   player; Coalition must identify both teams and show their shared scores.
 
 Any lifecycle, input-coordinate, storage or asset-discovery failure blocks the
 release even if CI is green.

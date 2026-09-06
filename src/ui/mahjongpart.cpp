@@ -31,6 +31,8 @@
 #include "runegamewidgets.h"
 #include "actions.h"
 #include "mahjongpart.h"
+#include "matchtopology.h"
+#include "matchpresentation.h"
 
 namespace
 {
@@ -95,8 +97,10 @@ void OrderTurn::render(Window & win, const Wind & localWind, const Wind & curren
     const WindCompass winds(localWind);
 
     renderCentered(win, windPositions.center, windsMarker[partWind() - 1]);
-    renderCentered(win, windPositions.left, createMarker(winds.left(), winds.left() == currentWind));
-    renderCentered(win, windPositions.right, createMarker(winds.right(), winds.right() == currentWind));
+    if(activeMatchTopology().hasWind(winds.left()()))
+        renderCentered(win, windPositions.left, createMarker(winds.left(), winds.left() == currentWind));
+    if(activeMatchTopology().hasWind(winds.right()()))
+        renderCentered(win, windPositions.right, createMarker(winds.right(), winds.right() == currentWind));
     renderCentered(win, windPositions.top, createMarker(winds.top(), winds.top() == currentWind));
     renderCentered(win, windPositions.bottom, createMarker(winds.bottom(), winds.bottom() == currentWind));
 }
@@ -132,7 +136,7 @@ bool TurnAnimation::isLastSprite(void) const
 }
 
 MahjongPartScreen::MahjongPartScreen() : JsonWindow("screen_mahjongpart.json", nullptr),
-    myAvatar(GameData::myPerson().avatar), orderTurn(jobject), animationTurn(jobject, "animation:turn"),
+    myAvatar(GameData::localMahjongAvatar()), orderTurn(jobject), animationTurn(jobject, "animation:turn"),
     animationChao(jobject, "animation:chao"), animationPung(jobject, "animation:pung"),
     animationKong(jobject, "animation:kong"), animationGame(jobject, "animation:game"),
     stoneSelected(-1), variantSelected(-1), playersMarker(0), animationDropStep(40),
@@ -332,6 +336,34 @@ void MahjongPartScreen::renderWindow(void)
 {
     JsonWindow::renderWindow();
 
+    if(MatchPresentation::duel())
+    {
+        // Two opposing seats; the four printed clan emblems belong to the
+        // original table and must not imply two additional participants.
+        using namespace MatchPresentation;
+        card(*this, Rect(94, 4, 836, 654), Color(107, 99, 70));
+        card(*this, Rect(282, 106, 456, 452), Color(70, 82, 81));
+        renderLine(Color(70, 82, 81), Point(300, 548), Point(720, 548));
+        for(const auto & seat : {ld.remoteTop(), ld.remoteBottom()})
+        {
+            const int y = seat.avatar == ld.myPlayer().avatar ? 563 : 57;
+            renderColor(sideColor(side(seat)), Rect(300, y, 424, 2));
+        }
+        text(*this, modeName(), Point(180, 156), 150, ink(), 26);
+        int labelY = 198;
+        for(const std::string & line : GameTheme::fontRender("dejavus14").splitStringWidth(rulesName(), 166))
+        {
+            text(*this, line, Point(180, labelY), 166, ink(), 14);
+            labelY += 18;
+        }
+    }
+    else
+    {
+        MatchPresentation::card(*this, Rect(280, 554, 466, 26), Color(107, 99, 70));
+        MatchPresentation::text(*this, MatchPresentation::modeName() + " / " + MatchPresentation::rulesName(),
+                                Point(513, 557), 450, MatchPresentation::ink(), 16);
+    }
+
     renderCroupier();
     renderWinRules();
     renderNames();
@@ -365,10 +397,10 @@ void MahjongPartScreen::renderWindow(void)
     else
 	animationTurn.renderAll(*this);
 
-    animationChao.render(*this);
-    animationPung.render(*this);
-    animationKong.render(*this);
-    animationGame.render(*this);
+    if(!MatchPresentation::duel() || animationChao.isEnabled()) animationChao.render(*this);
+    if(!MatchPresentation::duel() || animationPung.isEnabled()) animationPung.render(*this);
+    if(!MatchPresentation::duel() || animationKong.isEnabled()) animationKong.render(*this);
+    if(!MatchPresentation::duel() || animationGame.isEnabled()) animationGame.render(*this);
 
     if(0 > variantSelected &&
 	ld.dropStone.isValid() && 0 > stoneSelected)
@@ -683,7 +715,10 @@ std::string MahjongPartScreen::playerPrettyName(const RemotePlayer & player) con
 {
     std::string name = String::ucFirst(player.name());
 
-    if(player.isAI())
+    if(MatchPresentation::duel() || MatchPresentation::teams())
+        name += " / " + MatchPresentation::role(player);
+
+    if(GameData::usesAI(player))
 	name += " - AI";
     else
     if(! (playersMarker & (static_cast<int>(1) << player.wind())))
@@ -697,7 +732,9 @@ std::string MahjongPartScreen::playerPrettyName(const RemotePlayer & player) con
 
 void MahjongPartScreen::renderNamesHorizontal(const RemotePlayer & player, const Point & center)
 {
-    Color color = fastLogText.text.size() && fastLogOwner == player.wind ? fastLogText.color : defaultColor;
+    if(!player.avatar.isValid()) return;
+    Color color = fastLogText.text.size() && fastLogOwner == player.wind ? fastLogText.color :
+        (MatchPresentation::teams() ? MatchPresentation::sideColor(MatchPresentation::side(player)) : defaultColor);
     std::string name = playerPrettyName(player);
     const FontRender & frs = GameTheme::fontRender(namesFont);
 
@@ -709,7 +746,9 @@ void MahjongPartScreen::renderNamesHorizontal(const RemotePlayer & player, const
 
 void MahjongPartScreen::renderNamesVertical(const RemotePlayer & player, const Point & center)
 {
-    Color color = fastLogText.text.size() && fastLogOwner == player.wind ? fastLogText.color : defaultColor;
+    if(!player.avatar.isValid()) return;
+    Color color = fastLogText.text.size() && fastLogOwner == player.wind ? fastLogText.color :
+        (MatchPresentation::teams() ? MatchPresentation::sideColor(MatchPresentation::side(player)) : defaultColor);
     std::string name = playerPrettyName(player);
     const FontRender & frs = GameTheme::fontRender(namesFont);
 

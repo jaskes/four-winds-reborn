@@ -86,6 +86,25 @@ std::string Person::name(void) const
 /* Persons */
 Persons::Persons(const Person & person)
 {
+    if(activeMatchTopology().seatCount() == 2)
+    {
+        // One wizard per island half; the wizard's selected clan owns both
+        // original clan territories on that half for the entire new match.
+        const int side = activeMatchTopology().teamForClan(person.clan());
+        const Clan otherClan(side == 0 ? Clan::Yellow : Clan::Red);
+        Avatars opponents = GameData::avatarsOfClan(otherClan);
+        opponents.erase(std::remove(opponents.begin(), opponents.end(), person.avatar), opponents.end());
+        GameplayRng::shuffle(opponents.begin(), opponents.end());
+        Person human = person;
+        human.wind = Wind(side == 0 ? Wind::East : Wind::West);
+        human.setAI(false);
+        Person opponent(opponents.front(), otherClan, Wind(side == 0 ? Wind::West : Wind::East));
+        opponent.setAI(true);
+        push_back(human);
+        push_back(opponent);
+        std::sort(begin(), end(), [](const Person & a, const Person & b) { return a.wind < b.wind; });
+        return;
+    }
     reserve(4);
     push_back(person);
 
@@ -433,7 +452,7 @@ bool LocalPlayer::isMahjongChao(const Wind & currentWind, const Stone & dropSton
     if(isSilenced())
         return false;
 
-    return ruleset.allowsChao(wind == currentWind.next(),
+    return ruleset.allowsChao(wind == Wind(activeMatchTopology().nextWind(currentWind())),
                               dropStone.isValid() && !dropStone.isSpecial(),
                               static_cast<int>(stones.findChaoVariants(dropStone).size()));
 }
@@ -838,7 +857,7 @@ const LocalPlayer* LocalPlayers::playerOfAvatar(const Avatar & ava) const
 void LocalPlayers::shiftWinds(void)
 {
     for(auto & lp : *this)
-	lp.shiftWind();
+        lp.wind = Wind(activeMatchTopology().nextWind(lp.wind()));
 }
 
 bool LocalPlayers::findKongs(void) const

@@ -23,6 +23,8 @@
 #include "settings.h"
 #include "actions.h"
 #include "gametheme.h"
+#include "matchtopology.h"
+#include "matchpresentation.h"
 #include "battlesummarypart.h"
 
 BattleSummaryScreen::BattleSummaryScreen() : JsonWindow("screen_battle_summary.json", nullptr)
@@ -129,10 +131,25 @@ void BattleSummaryScreen::renderWindow(void)
 {
     JsonWindow::renderWindow();
 
-    renderPlayerSection(ld.playerOfWind(Wind::East), offsetPlayers[0]);
-    renderPlayerSection(ld.playerOfWind(Wind::West), offsetPlayers[1]);
-    renderPlayerSection(ld.playerOfWind(Wind::South), offsetPlayers[2]);
-    renderPlayerSection(ld.playerOfWind(Wind::North), offsetPlayers[3]);
+    int section = 0;
+    for(const auto wind : activeMatchTopology().winds())
+    {
+        const RemotePlayer & player = ld.playerOfWind(wind);
+        const Point pos = MatchPresentation::duel() ? Point(0, section * 350) : offsetPlayers[section];
+        if(MatchPresentation::duel())
+        {
+            using namespace MatchPresentation;
+            card(*this, Rect(6, pos.y + 6, 1012, 344), sideColor(side(player)));
+            text(*this, modeName() + " / " + role(player), Point(750, pos.y + 38), 450, sideColor(side(player)), 26);
+            text(*this, StringFormat(_("Spell Points: %1")).arg(player.points), Point(750, pos.y + 92), 400);
+        }
+        renderPlayerSection(player, pos);
+        if(MatchPresentation::teams())
+            MatchPresentation::text(*this, MatchPresentation::teamName(MatchPresentation::side(player)) + " / " +
+                MatchPresentation::role(player), pos + Point(330, 122), 330,
+                MatchPresentation::sideColor(MatchPresentation::side(player)), 16);
+        ++section;
+    }
 }
 
 bool BattleSummaryScreen::keyPressEvent(const KeySym & key)

@@ -326,8 +326,8 @@ void testMatchTopologyIdentityContract()
            !classic.alliedByClan(Clan::Red, Clan::Purple),
            "Classic topology must not silently group distinct or invalid winds");
 
-    const MatchTopology & duel = duelTopology();
-    expect(duel.id() == DuelTopologyId && duel.version() == DuelTopologyVersion &&
+    const MatchTopology & duel = legacyDuelTopology();
+    expect(duel.id() == DuelTopologyId && duel.version() == LegacyDuelTopologyVersion &&
            duel.seatCount() == 4 && duel.controllerCount() == 2 &&
            duel.teamCount() == 2 &&
            duel.sharesController(Wind::East, Wind::South) &&
@@ -338,7 +338,7 @@ void testMatchTopologyIdentityContract()
            duel.sharesControllerByClan(Clan::Red, Clan::Purple) &&
            duel.sharesControllerByClan(Clan::Yellow, Clan::Aqua) &&
            !duel.sharesControllerByClan(Clan::Red, Clan::Yellow) &&
-           findMatchTopology(DuelTopologyId, DuelTopologyVersion) == &duel,
+           findMatchTopology(DuelTopologyId, LegacyDuelTopologyVersion) == &duel,
            "Duel topology must expose two controllers that each own one island half");
 
     const MatchTopology & coalition = coalitionTopology();
@@ -4282,7 +4282,7 @@ int runRecoverySelfTest()
         std::string incompleteError;
         const std::string stateBeforeRejectedRestore = GameData::authoritativeState().toString();
         valid = valid && !Recovery::validateSaveState(incompleteState, &incompleteError) &&
-            incompleteError == "save does not contain four players" &&
+            incompleteError == "save player count does not match its topology" &&
             !GameData::restoreState(incompleteState) &&
             GameData::authoritativeState().toString() == stateBeforeRejectedRestore;
     }
@@ -4608,7 +4608,7 @@ void testMatchScoreContract()
     expect(MatchScore::winnerIndices(tiedScores) == std::vector<std::size_t>({ 0, 1 }),
            "winner selection must preserve every tied first-place player");
 
-    const MatchScore::Results duelScores = MatchScore::calculate(inputs, duelTopology());
+    const MatchScore::Results duelScores = MatchScore::calculate(inputs, legacyDuelTopology());
     expect(duelScores.size() == 4, "duel score must retain all four hands");
     if(duelScores.size() == 4)
     {
@@ -4649,7 +4649,7 @@ void testMatchScoreContract()
 void testMatchTopologyRuntimeContract()
 {
     std::string topologyError;
-    expect(selectActiveMatchTopology(DuelTopologyId, DuelTopologyVersion,
+    expect(selectActiveMatchTopology(DuelTopologyId, LegacyDuelTopologyVersion,
                                      &topologyError),
            "Duel runtime fixture must select the Duel topology");
     GameplayRng::seed(UINT64_C(0x15d0e1));
@@ -4721,7 +4721,7 @@ void testMatchTopologyRuntimeContract()
     headless.push_back(Person(Avatar::Lakkho, Clan::Yellow, Wind::West));
     headless.push_back(Person(Avatar::Ziag, Clan::Aqua, Wind::North));
     for(Person & player : headless) player.setAI(true);
-    expect(selectActiveMatchTopology(DuelTopologyId, DuelTopologyVersion,
+    expect(selectActiveMatchTopology(DuelTopologyId, LegacyDuelTopologyVersion,
                                      &topologyError) &&
            GameData::initPersons(headless),
            "headless Duel fixture must accept four exact AI seats");
@@ -5242,7 +5242,7 @@ int runHeadlessMatchSelfTest()
         return true;
     };
 
-    if(!validateTeamMatch(DuelTopologyId, DuelTopologyVersion,
+    if(!validateTeamMatch(DuelTopologyId, LegacyDuelTopologyVersion,
                           UINT64_C(0x15a5d001)) ||
        !validateTeamMatch(CoalitionTopologyId, CoalitionTopologyVersion,
                           UINT64_C(0x15a5c001)) ||
@@ -5599,8 +5599,12 @@ int runBalanceReplayVerification(int argc, char** argv)
 }
 }
 
+int runLocalModesUiTests(const char* program);
+
 int main(int argc, char** argv)
 {
+    if(1 < argc && std::string(argv[1]) == "--local-modes-ui-self-test")
+        return runLocalModesUiTests(argv[0]);
 #if defined(_WIN32)
     if(1 < argc && std::string(argv[1]) == "--windows-crash-report-child")
     {

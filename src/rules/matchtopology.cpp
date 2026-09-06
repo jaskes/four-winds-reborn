@@ -61,7 +61,7 @@ namespace
         return -1;
     }
 
-    class DuelTopology final : public MatchTopology
+    class LegacyDuelTopology : public MatchTopology
     {
     public:
         const std::string & id(void) const override
@@ -70,7 +70,7 @@ namespace
             return value;
         }
 
-        int version(void) const override { return DuelTopologyVersion; }
+        int version(void) const override { return LegacyDuelTopologyVersion; }
         int seatCount(void) const override { return 4; }
         int controllerCount(void) const override { return 2; }
         int teamCount(void) const override { return 2; }
@@ -78,6 +78,20 @@ namespace
         int teamForWind(int windId) const override { return halfForWind(windId); }
         int controllerForClan(int clanId) const override { return halfForClan(clanId); }
         int teamForClan(int clanId) const override { return halfForClan(clanId); }
+    };
+
+    class DuelTopology final : public LegacyDuelTopology
+    {
+    public:
+        int version(void) const override { return DuelTopologyVersion; }
+        int seatCount(void) const override { return 2; }
+        int controllerForWind(int windId) const override
+        {
+            if(windId == Wind::East) return 0;
+            if(windId == Wind::West) return 1;
+            return -1;
+        }
+        int teamForWind(int windId) const override { return controllerForWind(windId); }
     };
 
     class CoalitionTopology final : public MatchTopology
@@ -123,6 +137,26 @@ bool MatchTopology::sharesController(int firstWindId, int secondWindId) const
     return 0 <= first && first == controllerForWind(secondWindId);
 }
 
+const std::vector<Wind::wind_t> & MatchTopology::winds(void) const
+{
+    static const std::vector<Wind::wind_t> four = { Wind::East, Wind::South, Wind::West, Wind::North };
+    static const std::vector<Wind::wind_t> two = { Wind::East, Wind::West };
+    return seatCount() == 2 ? two : four;
+}
+
+bool MatchTopology::hasWind(int windId) const
+{
+    const auto & seats = winds();
+    return std::find(seats.begin(), seats.end(), windId) != seats.end();
+}
+
+Wind::wind_t MatchTopology::nextWind(int windId) const
+{
+    const auto & seats = winds();
+    auto it = std::find(seats.begin(), seats.end(), windId);
+    return it == seats.end() || ++it == seats.end() ? seats.front() : *it;
+}
+
 bool MatchTopology::allied(int firstWindId, int secondWindId) const
 {
     const int first = teamForWind(firstWindId);
@@ -153,6 +187,12 @@ const MatchTopology & duelTopology(void)
     return topology;
 }
 
+const MatchTopology & legacyDuelTopology(void)
+{
+    static const LegacyDuelTopology topology;
+    return topology;
+}
+
 const MatchTopology & coalitionTopology(void)
 {
     static const CoalitionTopology topology;
@@ -170,6 +210,8 @@ const MatchTopology* findMatchTopology(const std::string & id, int version)
     if(id == classic.id() && version == classic.version()) return &classic;
     const MatchTopology & duel = duelTopology();
     if(id == duel.id() && version == duel.version()) return &duel;
+    const MatchTopology & legacyDuel = legacyDuelTopology();
+    if(id == legacyDuel.id() && version == legacyDuel.version()) return &legacyDuel;
     const MatchTopology & coalition = coalitionTopology();
     if(id == coalition.id() && version == coalition.version()) return &coalition;
     return nullptr;

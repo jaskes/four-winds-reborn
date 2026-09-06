@@ -36,7 +36,8 @@ namespace
     {
         PlayerView result;
         result.reserve(local.players.size());
-        for(const LocalPlayer & player : local.players) result.push_back(&player);
+        for(const LocalPlayer & player : local.players)
+            if(player.avatar.isValid()) result.push_back(&player);
         return result;
     }
 

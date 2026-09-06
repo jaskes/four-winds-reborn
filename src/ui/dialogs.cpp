@@ -25,6 +25,8 @@
 #include <algorithm>
 
 #include "gametheme.h"
+#include "matchtopology.h"
+#include "matchpresentation.h"
 #include "actions.h"
 #include "battle.h"
 #include "battleuitext.h"
@@ -1219,10 +1221,24 @@ void MapStatusDialog::renderWindow(void)
 {
     renderTexture(background, Point(0, 0));
 
-    renderWindSection(localData.playerOfWind(Wind::East), offsetWinds[0]);
-    renderWindSection(localData.playerOfWind(Wind::South), offsetWinds[1]);
-    renderWindSection(localData.playerOfWind(Wind::West), offsetWinds[2]);
-    renderWindSection(localData.playerOfWind(Wind::North), offsetWinds[3]);
+    int section = 0;
+    for(const auto wind : activeMatchTopology().winds())
+    {
+        const auto & player = localData.playerOfWind(wind);
+        Point pos = offsetWinds[section++];
+        if(MatchPresentation::duel())
+        {
+            if(section == 1) renderColor(MatchPresentation::panel(), Rect(0, 0, width(), 706));
+            pos = Point(10, 90 + (section - 1) * 320);
+            MatchPresentation::card(*this, Rect(12, pos.y - 38, 1000, 240),
+                MatchPresentation::sideColor(MatchPresentation::side(player)));
+        }
+        renderWindSection(player, pos);
+        if(MatchPresentation::duel() || MatchPresentation::teams())
+            MatchPresentation::text(*this, MatchPresentation::duel() ? MatchPresentation::role(player) :
+                MatchPresentation::teamName(MatchPresentation::side(player)), pos + Point(325, 42), 200,
+                MatchPresentation::sideColor(MatchPresentation::side(player)), 14);
+    }
 
     const FontRender & defaultFont = GameTheme::fontRender(font);
 
@@ -1230,7 +1246,7 @@ void MapStatusDialog::renderWindow(void)
     Rect pos = renderText(defaultFont, _("Order Of Play"), textColor, orderPlayPos);
 
     pos.x += pos.w + 10;
-    for(auto & id : winds_all)
+    for(auto & id : activeMatchTopology().winds())
     {
 	const RemotePlayer & player = localData.playerOfWind(id);
 	const ClanInfo & info = GameData::clanInfo(player.clan);
@@ -1287,9 +1303,10 @@ void MapStatusDialog::renderWindSection(const RemotePlayer & player, const Point
 
     int index = 0;
     // render other clan icons
-    for(auto & clan : clans_all)
+    for(const auto & participant : localData.toPersons())
     {
-	if(player.clan() != clan)
+        const Clan clan = participant.clan;
+	if(!activeMatchTopology().alliedByClan(player.clan(), clan()))
 	{
 		    const ClanInfo & other = GameData::clanInfo(clan);
 		    renderTexture(GameTheme::texture(other.button), pos + offsetClanIcons[index]);
@@ -1655,6 +1672,12 @@ bool CombatScreenDialog::mouseClickEvent(const ButtonsEvent & coords)
 /* TargetPlayerDialog */
 TargetPlayerButton::TargetPlayerButton(const RemotePlayer & target, Window & win) : JsonButton(& win)
 {
+    if(!target.avatar.isValid())
+    {
+        setVisible(false);
+        setDisabled(true);
+        return;
+    }
     const AvatarInfo & avatarInfo = GameData::avatarInfo(target.avatar);
     const Texture & icon = GameTheme::sprite(avatarInfo.portrait);
 
@@ -1685,9 +1708,9 @@ TargetPlayerDialog::TargetPlayerDialog(const LocalData & ld, Window & win)
     // Player-targeted control spells describe an opponent, not merely another
     // seat. Fixed-team topologies therefore keep the allied seat visible for
     // orientation, but make it impossible to select as a hostile target.
-    buttonTargetLeft.setDisabled(GameData::allied(ld.myPlayer(), ld.remoteLeft()));
-    buttonTargetRight.setDisabled(GameData::allied(ld.myPlayer(), ld.remoteRight()));
-    buttonTargetTop.setDisabled(GameData::allied(ld.myPlayer(), ld.remoteTop()));
+    buttonTargetLeft.setDisabled(!ld.remoteLeft().avatar.isValid() || GameData::allied(ld.myPlayer(), ld.remoteLeft()));
+    buttonTargetRight.setDisabled(!ld.remoteRight().avatar.isValid() || GameData::allied(ld.myPlayer(), ld.remoteRight()));
+    buttonTargetTop.setDisabled(!ld.remoteTop().avatar.isValid() || GameData::allied(ld.myPlayer(), ld.remoteTop()));
 
     signalSubscribe(buttonTargetLeft, Signal::ButtonClicked);
     signalSubscribe(buttonTargetRight, Signal::ButtonClicked);

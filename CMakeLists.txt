@@ -269,6 +269,7 @@ if(BUILD_TESTING AND NOT ANDROID)
     add_executable(gameplay_regression_tests
         tests/gameplay_regression_tests.cpp
         tests/avatar_balance_tests.cpp
+        tests/local_modes_ui_tests.cpp
         src/ai/tournament.cpp
         ${FOUR_WINDS_SOURCE})
     target_compile_definitions(gameplay_regression_tests PRIVATE
@@ -280,6 +281,10 @@ if(BUILD_TESTING AND NOT ANDROID)
         target_link_libraries(gameplay_regression_tests dbghelp comdlg32)
     endif()
     add_test(NAME gameplay_regressions COMMAND gameplay_regression_tests)
+    add_test(NAME local_modes_ui COMMAND gameplay_regression_tests --local-modes-ui-self-test)
+    set_tests_properties(local_modes_ui PROPERTIES
+        TIMEOUT 90
+        ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy;SDL_RENDER_DRIVER=software;FOUR_WINDS_SETTINGS_FILE=${CMAKE_BINARY_DIR}/local-modes-ui/settings.json;FOUR_WINDS_RECOVERY_DIR=${CMAKE_BINARY_DIR}/local-modes-ui/recovery;FOUR_WINDS_SAVE_DIR=${CMAKE_BINARY_DIR}/local-modes-ui/saves")
     set_tests_properties(gameplay_regressions PROPERTIES
         ENVIRONMENT "FOUR_WINDS_RECOVERY_DIR=${CMAKE_BINARY_DIR}/recovery-test-gameplay;FOUR_WINDS_SAVE_DIR=${CMAKE_BINARY_DIR}/save-test-gameplay")
     add_test(NAME avatar_balance_metrics COMMAND gameplay_regression_tests --balance-only)

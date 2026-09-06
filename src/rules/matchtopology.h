@@ -11,14 +11,17 @@
 #define FOUR_WINDS_MATCH_TOPOLOGY_H
 
 #include <string>
+#include <vector>
 
 #include "swe/swe_json.h"
+#include "gameobjects.h"
 
 constexpr const char MatchTopologyIdentityKey[] = "matchTopology";
 constexpr const char ClassicFreeForAllTopologyId[] = "classic-ffa";
 constexpr int ClassicFreeForAllTopologyVersion = 1;
 constexpr const char DuelTopologyId[] = "duel";
-constexpr int DuelTopologyVersion = 1;
+constexpr int LegacyDuelTopologyVersion = 1;
+constexpr int DuelTopologyVersion = 2;
 constexpr const char CoalitionTopologyId[] = "coalition";
 constexpr int CoalitionTopologyVersion = 1;
 
@@ -47,6 +50,9 @@ public:
     bool allied(int firstWindId, int secondWindId) const;
     bool sharesControllerByClan(int firstClanId, int secondClanId) const;
     bool alliedByClan(int firstClanId, int secondClanId) const;
+    const std::vector<Wind::wind_t> & winds(void) const;
+    bool hasWind(int windId) const;
+    Wind::wind_t nextWind(int windId) const;
 };
 
 struct MatchTopologyIdentity
@@ -59,6 +65,7 @@ struct MatchTopologyIdentity
 
 const MatchTopology & classicFreeForAllTopology(void);
 const MatchTopology & duelTopology(void);
+const MatchTopology & legacyDuelTopology(void);
 const MatchTopology & coalitionTopology(void);
 const MatchTopology & activeMatchTopology(void);
 const MatchTopology* findMatchTopology(const std::string & id, int version);

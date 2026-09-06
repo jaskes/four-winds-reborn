@@ -29,6 +29,7 @@
 #include "aispell.h"
 #include "aistrategy.h"
 #include "gamedata.h"
+#include "matchtopology.h"
 #include "gameplayrng.h"
 #include "runegameruleset.h"
 
@@ -138,7 +139,7 @@ void AI::mahjongSummonCast(const Avatar & avatar, const Creatures & summons, con
 
 void AI::mahjongOtherPass(const Wind & currentWind, ActionList & actions, const Wind & skip)
 {
-    for(auto & id : winds_all)
+    for(auto & id : activeMatchTopology().winds())
     {
 	LocalPlayer & playerAI = GameData::playerOfWind(id);
 
@@ -291,7 +292,7 @@ bool AI::mahjongGameKongPungChao(const Wind & currentWind, const Wind & roundWin
                                  const RuneGameRuleset & ruleset)
 {
     // set game
-    for(auto & id : winds_all)
+    for(auto & id : activeMatchTopology().winds())
     {
 	if(id == currentWind())
 		continue;
@@ -310,7 +311,7 @@ bool AI::mahjongGameKongPungChao(const Wind & currentWind, const Wind & roundWin
 
 	std::vector<std::pair<Avatar, MahjongCallPlan>> callPlans;
 	callPlans.reserve(3);
-	for(auto & id : winds_all)
+	for(auto & id : activeMatchTopology().winds())
 	{
 	    if(id == currentWind())
 		continue;

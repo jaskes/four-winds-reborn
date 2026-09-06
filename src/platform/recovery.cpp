@@ -184,9 +184,10 @@ bool Recovery::validateSaveState(const SWE::JsonObject & state, std::string* err
         if(error) *error = "save does not identify the local player";
         return false;
     }
-    if(!players || players->size() != 4)
+    const MatchTopology & match = *findMatchTopology(topology.id, topology.version);
+    if(!players || players->size() != match.seatCount())
     {
-        if(error) *error = "save does not contain four players";
+        if(error) *error = "save player count does not match its topology";
         return false;
     }
 
@@ -216,7 +217,7 @@ bool Recovery::validateSaveState(const SWE::JsonObject & state, std::string* err
         const std::string clan = player->getString("clan");
         const std::string wind = player->getString("wind");
         if(avatar.empty() || avatar == "none" || avatar == "random" ||
-           clan.empty() || clan == "none" || wind.empty() || wind == "none")
+           clan.empty() || clan == "none" || !match.hasWind(Wind(wind)()))
         {
             if(error) *error = "save player identity is invalid";
             return false;
@@ -230,6 +231,45 @@ bool Recovery::validateSaveState(const SWE::JsonObject & state, std::string* err
 
         if(avatar == myAvatar && clan == myClan)
             localPlayerFound = true;
+    }
+
+    if(match.seatCount() == 2)
+    {
+        const Clan first(players->getObject(0)->getString("clan"));
+        const Clan second(players->getObject(1)->getString("clan"));
+        if(!first.isValid() || !second.isValid() || match.alliedByClan(first(), second()))
+        {
+            if(error) *error = "Duel save must contain opposite island halves";
+            return false;
+        }
+        const auto* owners = state.getObject("landOwners");
+        if(!owners)
+        {
+            if(error) *error = "Duel save is missing its island ownership";
+            return false;
+        }
+        for(const auto landId : lands_all)
+        {
+            const Land land(landId);
+            if(!land.isTowerWinds())
+            {
+                const std::string owner = owners->getString(land.toString());
+                if(!clans.count(owner))
+                {
+                    if(error) *error = "Duel territory has no participating owner";
+                    return false;
+                }
+            }
+        }
+        for(const char* key : {"wind:current", "wind:part"})
+        {
+            const Wind wind(state.getString(key));
+            if((state.getInteger("gamepart") != 0 || wind.isValid()) && !match.hasWind(wind()))
+            {
+                if(error) *error = "Duel save refers to an inactive seat";
+                return false;
+            }
+        }
     }
 
     if(!localPlayerFound)

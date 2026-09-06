@@ -20,7 +20,7 @@ launch `four-winds-reborn.exe`; on Android 6.0 or newer, install the APK.
 
 ## Roadmap
 
-- The v0.5 local-mode slice is complete: Quick Rune Game, two-controller Duel,
+- The v0.5 candidate includes Quick Rune Game, two-player Duel,
   four-controller Coalition and improved Android touch ergonomics.
 - Expand modular rulesets, mobile accessibility/device coverage and balance
   evidence for the new local modes.
@@ -62,7 +62,9 @@ launch `four-winds-reborn.exe`; on Android 6.0 or newer, install the APK.
   economy-boosted challenge. No level receives favorable RNG or access to
   hidden information.
 - Versioned match modes independent from the Rune Game rules: Classic free for
-  all, hot-seat Duel and fixed-team Coalition, plus a Quick East-round ruleset.
+  all, Duel (one hand and half the island per player) and fixed-team Coalition,
+  plus a Quick East-round ruleset. Settings affect new games; Continue keeps
+  the saved mode. Old four-hand Duel saves remain readable.
 - Native Android arm64 support with touch input, lifecycle-safe audio and
   storage, installable APK releases and enlarged hit targets for small legacy
   controls.

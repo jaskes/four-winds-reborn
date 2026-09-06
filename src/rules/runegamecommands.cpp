@@ -16,6 +16,7 @@
 #include "aiturn.h"
 #include "crashreport.h"
 #include "gamedata.h"
+#include "matchtopology.h"
 #include "replay.h"
 #include "runegameruleset.h"
 
@@ -254,7 +255,7 @@ bool GameData::clientButtonPass(const Avatar & avatar, const ClientMessage & act
 	    [](const LocalPlayer & player){ return GameData::usesAI(player); });
 	if(!GameData::usesAI(client) || allAI)
 	{
-	    currentWind.shift();
+	    currentWind = Wind(activeMatchTopology().nextWind(currentWind()));
 	    croupier.put(dropStone);
 	    dropStone = Stone(Stone::None);
     }

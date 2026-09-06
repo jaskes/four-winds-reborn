@@ -25,6 +25,8 @@
 #include "settings.h"
 #include "gamedata.h"
 #include "gametheme.h"
+#include "matchtopology.h"
+#include "matchpresentation.h"
 #include "dialogs.h"
 #include "adventureuievents.h"
 #include "battlechoicedialog.h"
@@ -189,6 +191,18 @@ void LandPolygon::renderWindow(void)
     {
 	if(! landInfo.id.isTowerWinds())
 	{
+
+            if(MatchPresentation::duel() || MatchPresentation::teams())
+            {
+                const Points & outline = poly.boundaryVertices();
+                const Color color = MatchPresentation::sideColor(activeMatchTopology().teamForClan(owner()));
+                for(auto it = outline.begin(); it != outline.end(); ++it)
+                {
+                    auto next = std::next(it);
+                    if(next == outline.end()) next = outline.begin();
+                    renderLine(color, *it - position(), *next - position());
+                }
+            }
 	    const ClanInfo & clanInfo = GameData::clanInfo(owner);
 	    const Texture & textureTown = GameTheme::texture(clanInfo.town);
 	    const Size offy(0, 15);
@@ -222,9 +236,9 @@ void LandPolygon::renderWindow(void)
 	    std::vector<Texture> flags;
 	    int width = 0;
 
-	    for(auto & clan : clans_all)
+	    for(const auto & other : win->ld.players)
 	    {
-		const RemotePlayer & other = win->ld.playerOfClan(clan);
+                if(!other.avatar.isValid()) continue;
 		const BattleParty* party = other.army.findPartyConst(landInfo.id);
 
 		if(party && !party->isEmpty())
@@ -670,6 +684,20 @@ void MapScreenBase::renderWindow(void)
     const Land infoLand = forecastTarget.isValid() ? forecastTarget : selectedLand;
     if(infoLand.isValid()) renderLandInfo(infoLand);
     renderBattleForecast();
+    if(MatchPresentation::duel() || MatchPresentation::teams())
+    {
+        using namespace MatchPresentation;
+        card(*this, Rect(136, 6, 520, 27), Color(107, 99, 70));
+        text(*this, modeName(), Point(396, 10), 135, ink(), 16);
+        for(int team = 0; team < 2; ++team)
+        {
+            std::string name = teamName(team);
+            if(duel())
+                for(const auto & player : ld.players)
+                    if(player.avatar.isValid() && side(player) == team) name = player.name();
+            text(*this, name, Point(team == 0 ? 230 : 561, 10), 177, sideColor(team), 16);
+        }
+    }
 }
 
 bool MapScreenBase::userEvent(int event, void* data)
@@ -951,9 +979,9 @@ void AdventurePartScreen::tickEvent(u32 ms)
 {
     if(allowTickEvent && tt.check(ms, 100))
     {
-        if(actions.empty()) selectLocalAvatar();
+        const bool switched = actions.empty() && selectLocalAvatar();
         GameData::adventure2Client(myAvatar, actions);
-        bool redraw = false;
+        bool redraw = switched;
         bool processedAction = false;
         int lastActionType = Action::None;
 

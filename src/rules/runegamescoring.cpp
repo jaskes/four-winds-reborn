@@ -25,6 +25,7 @@
 #include <sstream>
 
 #include "gamedata.h"
+#include "matchtopology.h"
 #include "runegameruleset.h"
 
 /* WinResults */
@@ -561,7 +562,7 @@ OpponentFinesList WinResults::opponentFines(void) const
     {
         if(windWin == windCurrent)
         {
-	    for(auto & id : winds_all)
+	    for(auto & id : activeMatchTopology().winds())
 	    {
                 if(windWin.id() != id)
                     res << OpponentFine(id, 2);
@@ -576,7 +577,7 @@ OpponentFinesList WinResults::opponentFines(void) const
     {
         if(windWin == windCurrent)
         {
-	    for(auto & id : winds_all)
+	    for(auto & id : activeMatchTopology().winds())
 	    {
                 if(windWin.id() != id)
                     res << OpponentFine(id, (windCurrent.id() == id ? 2 : 1));

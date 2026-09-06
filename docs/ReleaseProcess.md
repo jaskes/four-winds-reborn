@@ -73,8 +73,11 @@ Before merging a release, freeze its scope and complete all of the following:
    - switch windowed/fullscreen modes and resize the window;
    - complete a Rune Game hand, Adventure movement, a manual battle and the
      score/victory flow.
-   - start Quick, Duel and Coalition sessions; verify local-hand switching,
-     fixed allies, hostile targeting rules and team score summaries.
+   - start Quick, Duel and Coalition sessions; verify two players, one hand
+     each and two island owners in a new Duel; verify fixed Coalition allies,
+     hostile targeting rules and both team scores;
+   - continue an old `duel@1` save and verify both local hands remain playable;
+   - check Russian settings at 100% and 125% scale for clipped values.
 
 Reborn may ship with `release` provenance status when the validator reports
 zero unclassified inherited live media and zero identical narrative fields.

@@ -110,7 +110,7 @@ MatchScore::Results MatchScore::current(void)
     inputs.reserve(winds_all.size());
 
     const LocalPlayers & players = GameData::players();
-    for(const auto windId : winds_all)
+    for(const auto windId : activeMatchTopology().winds())
     {
         const Wind wind(windId);
         const auto player = std::find_if(players.begin(), players.end(),

@@ -159,14 +159,14 @@ Status: accepted on 2026-08-08.
 
 Match topology is independent from the Rune Game ruleset. A ruleset defines
 how the rune wall, calls, scoring and round flow work; a topology defines how
-the four stable clans are assigned to controllers and competitive teams. Wind
+active seats and stable clans are assigned to controllers and competitive teams. Wind
 is deliberately not used as ownership identity because seats rotate between
 Rune Game rounds while control and allegiance must remain stable.
 This separation lets Classic, Duel and Coalition reuse a compatible ruleset
 without embedding player ownership into Mahjong rules.
 
 Classic free-for-all is identified as `classic-ffa@1`: four clans, four
-controllers and four teams. Duel is `duel@1`: the Red and Purple clans share
+controllers and four teams. Legacy Duel is `duel@1`: the Red and Purple clans share
 controller/team 0, while Yellow and Aqua share controller/team 1. The local
 player therefore controls two hands and two clans; the active local hand
 follows the Rune Game turn, and one discard-response window covers both local
@@ -194,6 +194,9 @@ and seat rotation. Its only rules change is tournament length: it plays the
 four hands of the East round and finishes after the North hand instead of
 continuing through South, West and North rounds.
 
+With the two-player topology below, each round instead has two deals (East
+and West); Quick therefore ends after the West deal of the East round.
+
 The setting is a default for newly created games only. Once a match starts,
 its explicit ruleset identity is persisted in saves, recovery checkpoints and
 replays; changing Settings cannot silently convert that match. Existing and
@@ -204,3 +207,31 @@ Quick is the first production proof that the ruleset seam supports a real
 player-facing variant without changing Classic behavior. Regression coverage
 locks its registered identity, East-round completion point, settings
 persistence, legacy fallback and restoration of Classic as the default.
+
+## RD-010: two-player Duel and visible team modes
+
+Status: accepted by the owner on 2026-09-06 during candidate review.
+
+New Duel games use `duel@2`: exactly two players, one hand per player, one
+human against one AI. Active seats are East and West. Turn advance, Chao's
+next-player eligibility, AI responses, settlement and Adventure completion
+visit only those seats. The original wall, 13-rune hand, draw limit and win
+formula remain unchanged. A normal match plays two deals in each of four
+rounds (eight hands); Quick plays two deals in the East round.
+
+The selected wizard's clan owns the whole corresponding island half. Original
+Red/Purple territory forms the western half; Yellow/Aqua forms the eastern
+half. Each half is reassigned to its participating wizard, including its
+summoning circles. The central Tower remains neutral. Captures can subsequently
+change the border. Starting another four-player game restores original owners.
+
+The mode uses two participant cards, two opposite table seats, two map-status
+sections and two result columns. Coalition retains four hands and clans, with
+the same two teams indicated on rosters, names, island outlines and summaries.
+Its result columns aggregate each team's raw categories and standing points;
+the team total, rank and victory are common to both members.
+
+`duel@1` saves/recovery/replays retain their original four-hand semantics;
+they are not silently converted. New `duel@2` saves require two unique seats,
+opposite clan halves, and explicit ownership of every town by a participant.
+Changing Settings affects new games only; Continue restores the saved mode.

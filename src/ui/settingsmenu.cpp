@@ -304,6 +304,17 @@ void SettingsMenuScreen::renderWindow(void)
         descriptionY += small.lineSkipHeight();
     }
 
+    const std::string modeDescription = matchMode == "duel" ?
+        _("Duel: two players, one hand each, half the island each.") : matchMode == "coalition" ?
+        _("Coalition: four players in two teams with a shared victory.") :
+        _("Free for All: four independent players.");
+    descriptionY = std::max(descriptionY + 16, difficultyArea.y + 352);
+    for(const std::string & line : footer.splitStringWidth(modeDescription, descriptionWidth))
+    {
+        renderText(footer, line, titleColor, Point(leftCenter, descriptionY), AlignCenter);
+        descriptionY += footer.lineSkipHeight();
+    }
+
     renderLine(dividerColor,
                Point(difficultyArea.x + 18, difficultyArea.y + difficultyArea.h - 82),
                Point(difficultyArea.x + difficultyArea.w - 18,
@@ -312,7 +323,7 @@ void SettingsMenuScreen::renderWindow(void)
                Point(leftCenter, difficultyArea.y + difficultyArea.h - 66), AlignCenter);
     int saveNoteY = difficultyArea.y + difficultyArea.h - 47;
     for(const std::string & line : footer.splitStringWidth(
-            _("Saved games are unchanged."), difficultyArea.w - 28))
+            _("Continue uses the saved match mode."), difficultyArea.w - 28))
     {
         renderText(footer, line, mutedColor, Point(leftCenter, saveNoteY), AlignCenter);
         saveNoteY += footer.lineSkipHeight();
@@ -363,10 +374,11 @@ void SettingsMenuScreen::renderWindow(void)
         }
         else
         {
-            renderText(menu, entryLabel(entry.kind), labelColor,
+            renderText(small, entryLabel(entry.kind), labelColor,
                        Point(entry.area.x + entry.area.w / 2, entry.area.y + 1), AlignCenter);
             renderText(small, value, isSelected ? titleColor : mutedColor,
-                       Point(entry.area.x + entry.area.w / 2, entry.area.y + 27), AlignCenter);
+                       Point(entry.area.x + entry.area.w / 2,
+                             entry.area.y + entry.area.h / 2), AlignCenter);
         }
     }
 
@@ -601,6 +613,7 @@ bool SettingsMenuScreen::mouseClickEvent(const ButtonsEvent & coords)
                     case ContentPackage:
                     case AIDifficulty:
                     case RuneGameRules:
+                    case MatchMode:
                     case GameSpeed:
                     case GuardianVoices:
                     case DisplayMode:

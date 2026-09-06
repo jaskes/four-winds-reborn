@@ -294,9 +294,11 @@ bool validConfiguration(const Simulation::MatchConfig & config, std::string* err
             std::to_string(config.matchTopologyVersion);
         return false;
     }
-    if(config.persons.size() != winds_all.size())
+    const MatchTopology & topology = *findMatchTopology(config.matchTopologyId,
+                                                       config.matchTopologyVersion);
+    if(config.persons.size() != static_cast<std::size_t>(topology.seatCount()))
     {
-        if(error) *error = "a match requires exactly four players";
+        if(error) *error = "player count does not match the selected topology";
         return false;
     }
     if(config.maximumTicks == 0 || config.maximumUnchangedTicks == 0 ||
@@ -317,7 +319,7 @@ bool validConfiguration(const Simulation::MatchConfig & config, std::string* err
             return false;
         }
         if(!person.avatar.isValid() || person.avatar == Avatar(Avatar::Random) ||
-           !person.clan.isValid() || !person.wind.isValid())
+           !person.clan.isValid() || !topology.hasWind(person.wind()))
         {
             if(error) *error = "every player needs a concrete avatar, clan and wind";
             return false;
@@ -335,6 +337,12 @@ bool validConfiguration(const Simulation::MatchConfig & config, std::string* err
             if(error) *error = "an avatar was assigned to an unsupported clan";
             return false;
         }
+    }
+    if(topology.seatCount() == 2 &&
+       topology.alliedByClan(config.persons[0].clan(), config.persons[1].clan()))
+    {
+        if(error) *error = "Duel requires one player on each island half";
+        return false;
     }
     return true;
 }

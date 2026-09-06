@@ -327,7 +327,8 @@ const BattleCreature* LocalData::findBattleUnitConst(int unit) const
 Persons LocalData::toPersons(void) const
 {
     Persons res;
-    res.assign(players.begin(), players.end());
+    for(const LocalPlayer & player : players)
+        if(player.avatar.isValid()) res.push_back(player);
     return res;
 }
 
@@ -402,7 +403,9 @@ bool GameData::isGameOver(void)
 
 bool GameData::isGameOver(const RuneGameRuleset & ruleset)
 {
-    return ruleset.advanceRound(roundWind(), partWind()).complete;
+    const int lastDeal = activeMatchTopology().seatCount() == 2 && partWind == Wind(Wind::West) ?
+        Wind::North : partWind();
+    return ruleset.advanceRound(roundWind(), lastDeal).complete;
 }
 
 std::list<BattleLegend> GameData::getBattleHistoryFor(const Avatar & avatar)
@@ -649,11 +652,13 @@ LocalData GameData::toLocalData(const Avatar & ava)
 
     lp = gamers.playerOfWind(ld.compass.left());
     if(lp) ld.players[0] = *lp;
-    else ERROR("player not found" << ", wind: " << ld.compass.left().toString());
+    else if(activeMatchTopology().hasWind(ld.compass.left()()))
+        ERROR("player not found" << ", wind: " << ld.compass.left().toString());
 
     lp = gamers.playerOfWind(ld.compass.right());
     if(lp) ld.players[1] = *lp;
-    else ERROR("player not found" << ", wind: " << ld.compass.right().toString());
+    else if(activeMatchTopology().hasWind(ld.compass.right()()))
+        ERROR("player not found" << ", wind: " << ld.compass.right().toString());
 
     lp = gamers.playerOfWind(ld.compass.top());
     if(lp) ld.players[2] = *lp;
@@ -773,6 +778,18 @@ void GameData::initPersons(const Person & cur)
     gamers.setPersons(persons);
     const LocalPlayer* selected = gamers.playerOfAvatar(cur.avatar);
     person = selected ? static_cast<const Person &>(*selected) : cur;
+    if(activeMatchTopology().seatCount() == 2)
+    {
+        // Keep the chosen wizard as the local reference when seated West.
+        std::rotate(persons.begin(), std::find_if(persons.begin(), persons.end(),
+            [&](const Person & p) { return p.avatar == person.avatar; }), persons.end());
+        initPersons(persons);
+        return;
+    }
+    // Restore all four original territories when starting after a Duel.
+    if(initialLandOwners.size() == landsInfo.size())
+        for(std::size_t index = 0; index < landsInfo.size(); ++index)
+            landsInfo[index].clan = initialLandOwners[index];
     grantAiDifficultyIncome(true);
     roundWind = Wind(Wind::None);
     partWind = Wind(Wind::None);
@@ -786,7 +803,8 @@ void GameData::initPersons(const Person & cur)
 
 bool GameData::initPersons(const Persons & configured)
 {
-    if(configured.size() != winds_all.size()) return false;
+    const MatchTopology & topology = activeMatchTopology();
+    if(configured.size() != static_cast<std::size_t>(topology.seatCount())) return false;
 
     std::set<int> avatars;
     std::set<int> clans;
@@ -799,6 +817,7 @@ bool GameData::initPersons(const Persons & configured)
            !configuredPerson.clan.isValid() || !configuredPerson.wind.isValid() ||
            !avatars.insert(configuredPerson.avatar()).second ||
            !clans.insert(configuredPerson.clan()).second ||
+           !topology.hasWind(configuredPerson.wind()) ||
            !winds.insert(configuredPerson.wind()).second)
             return false;
 
@@ -810,6 +829,9 @@ bool GameData::initPersons(const Persons & configured)
         clean.setAI(configuredPerson.isAI());
         persons.push_back(clean);
     }
+
+    if(topology.seatCount() == 2 &&
+       topology.alliedByClan(persons[0].clan(), persons[1].clan())) return false;
 
     Replay::clearActionJournal();
     gamers.setPersons(persons);
@@ -838,7 +860,13 @@ bool GameData::initPersons(const Persons & configured)
     if(initialLandOwners.size() == landsInfo.size())
     {
         for(std::size_t index = 0; index < landsInfo.size(); ++index)
+        {
             landsInfo[index].clan = initialLandOwners[index];
+            if(topology.seatCount() == 2 && initialLandOwners[index].isValid())
+                for(const Person & owner : persons)
+                    if(topology.alliedByClan(initialLandOwners[index](), owner.clan()))
+                        landsInfo[index].clan = owner.clan;
+        }
     }
 
     return true;
@@ -870,7 +898,19 @@ bool GameData::initMahjong(const RuneGameRuleset & ruleset)
     skipNewTurn = false;
     stateGUI.clear();
 
-    const RuneGameRoundAdvance advance = ruleset.advanceRound(roundWind(), partWind());
+    RuneGameRoundAdvance advance = ruleset.advanceRound(roundWind(), partWind());
+    if(activeMatchTopology().seatCount() == 2 && partWind.isValid())
+    {
+        // A round deals once per active seat. Keep the ruleset's round limit,
+        // including Quick's East-only limit, without inventing empty hands.
+        if(partWind == Wind(Wind::East))
+        {
+            advance.partWindId = Wind::West;
+            advance.rotatePlayerWinds = true;
+        }
+        else
+            advance = ruleset.advanceRound(roundWind(), Wind::North);
+    }
     if(advance.complete)
         return false;
 
@@ -897,7 +937,7 @@ bool GameData::initMahjong(const RuneGameRuleset & ruleset)
 void GameData::dumpOrderPersons(void)
 {
     DEBUG("players: ");
-    for(auto & id : winds_all)
+    for(auto & id : activeMatchTopology().winds())
     {
 	LocalPlayer & player = playerOfWind(id);
 
@@ -950,11 +990,16 @@ bool GameData::mahjong2Client(const Avatar & avatar, ActionList & actions)
 {
     LocalPlayer & current = playerOfWind(currentWind);
     const RuneGameRuleset & ruleset = activeRuneGameRuleset();
+    const auto rulesAt = [&](const Wind & wind) -> const WinRules & {
+        static const WinRules empty;
+        const LocalPlayer* player = gamers.playerOfWind(wind);
+        return player ? player->rules : empty;
+    };
     const auto runAutomatedTurn = [&](bool showGame, bool showKong)
     {
-	const WinRules & left = playerOfWind(prevWindCompass(currentWind)).rules;
-	const WinRules & right = playerOfWind(nextWindCompass(currentWind)).rules;
-	const WinRules & top = playerOfWind(oppositeWindCompass(currentWind)).rules;
+	const WinRules & left = rulesAt(prevWindCompass(currentWind));
+	const WinRules & right = rulesAt(nextWindCompass(currentWind));
+	const WinRules & top = rulesAt(oppositeWindCompass(currentWind));
 	return AI::mahjongTurn(currentWind, current.avatar, croupier.trash,
 	                       left, right, top, showGame, showKong, actions);
     };
@@ -964,9 +1009,9 @@ bool GameData::mahjong2Client(const Avatar & avatar, ActionList & actions)
 	if(GameData::usesAI(current))
 	{
 	    WinRules other;
-	    const WinRules & left = playerOfWind(prevWindCompass(currentWind)).rules;
-	    const WinRules & right = playerOfWind(nextWindCompass(currentWind)).rules;
-	    const WinRules & top = playerOfWind(oppositeWindCompass(currentWind)).rules;
+	    const WinRules & left = rulesAt(prevWindCompass(currentWind));
+	    const WinRules & right = rulesAt(nextWindCompass(currentWind));
+	    const WinRules & top = rulesAt(oppositeWindCompass(currentWind));
 	    other.reserve(left.size() + right.size() + top.size());
 	    other.insert(other.end(), left.begin(), left.end());
 	    other.insert(other.end(), right.begin(), right.end());
@@ -1049,9 +1094,9 @@ bool GameData::mahjong2Client(const Avatar & avatar, ActionList & actions)
 	    }
 
 	    WinRules other;
-	    const WinRules & left = playerOfWind(prevWindCompass(currentWind)).rules;
-	    const WinRules & right = playerOfWind(nextWindCompass(currentWind)).rules;
-	    const WinRules & top = playerOfWind(oppositeWindCompass(currentWind)).rules;
+	    const WinRules & left = rulesAt(prevWindCompass(currentWind));
+	    const WinRules & right = rulesAt(nextWindCompass(currentWind));
+	    const WinRules & top = rulesAt(oppositeWindCompass(currentWind));
 	    other.reserve(left.size() + right.size() + top.size());
 	    other.insert(other.end(), left.begin(), left.end());
 	    other.insert(other.end(), right.begin(), right.end());
@@ -1092,7 +1137,7 @@ void GameData::validateMahjongSummary(void)
 {
     int total = 0;
 
-    for(auto & id : winds_all)
+    for(auto & id : activeMatchTopology().winds())
     {
 	const LocalPlayer & player = GameData::playerOfWind(id);
 
