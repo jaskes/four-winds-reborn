@@ -11,7 +11,11 @@ so that commit, rather than GitHub fork metadata, is the comparison baseline.
 The project retains the original credits and license. Entries below describe
 Reborn work only; they do not claim authorship of inherited code or assets.
 
-## [Unreleased] - planned v0.5.0
+## [0.5.0] - 2026-09-06
+
+Source milestone for the completed local match modes. The source is frozen in
+`main` and tag `v0.5.0`; GitHub Release publication and downloadable release
+packages are deferred.
 
 ### Added - local match modes and rulesets
 
@@ -28,6 +32,9 @@ Reborn work only; they do not claim authorship of inherited code or assets.
 - Added localized Match Mode and Rune Game Rules selectors to Settings.
 - Added two-player rosters, rune table, island status and summaries, plus
   colour-coded Coalition teams and a shared final score for each team.
+- Added a dedicated ornate Reborn Duel table, transparent wind artwork,
+  visible rule guardians with consistent animation positions, and a compact
+  discard history for long two-player hands.
 
 ### Fixed - candidate review
 
@@ -46,6 +53,8 @@ Reborn work only; they do not claim authorship of inherited code or assets.
 - Kept the completed match intact when a request for another hand is refused.
 - Updated developer final-round fixtures and island inspection for Quick and
   two-player Duel; added state integrity and mode/difficulty replay matrices.
+- Preserved action-log ownership on Continue and accepted legacy clan aliases
+  consistently during recovery validation.
 
 ### Changed - topology-aware gameplay
 

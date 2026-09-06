@@ -18,9 +18,13 @@ with ready-to-run Windows, Linux and macOS x64 archives, a directly installable
 Android arm64 APK and SHA-256 checksums. On Windows, unpack the archive and
 launch `four-winds-reborn.exe`; on Android 6.0 or newer, install the APK.
 
+The local-mode milestone is frozen separately in source tag `v0.5.0`.
+Its GitHub Release and downloadable release packages have not been published;
+the latest published player packages remain `v0.4.0`.
+
 ## Roadmap
 
-- The v0.5 candidate includes Quick Rune Game, two-player Duel,
+- The v0.5.0 source milestone includes Quick Rune Game, two-player Duel,
   four-controller Coalition and improved Android touch ergonomics.
 - Expand modular rulesets, mobile accessibility/device coverage and balance
   evidence for the new local modes.

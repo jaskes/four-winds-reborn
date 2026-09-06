@@ -4,7 +4,7 @@ Four Winds Reborn uses two permanent branches:
 
 - `develop` is the integration branch. Normal gameplay, UI, content and tooling
   changes land here as focused commits.
-- `main` is the published release history. It receives completed release merges
+- `main` is the accepted release history. It receives completed release merges
   and exceptional hotfixes; it is not a general work branch.
 
 Do not force-push either permanent branch or rewrite published release history.
@@ -96,11 +96,11 @@ generic compatibility effects remain. Switching the initial presentation to
 Reborn is a separate product decision to make after README screenshots are
 updated and player feedback has been reviewed.
 
-## Tag and publish
+## Freeze a release tag
 
 After the gate and owner smoke test pass, merge the complete integration branch
 into `main` as an explicit release commit. Replace `X.Y.Z` below with the
-version being published:
+version being frozen:
 
 ```bash
 git switch main
@@ -111,18 +111,37 @@ git tag -a vX.Y.Z -m "Four Winds Reborn vX.Y.Z"
 git push origin vX.Y.Z
 ```
 
-Push `main` before the tag. The accepted tag builds and tests Linux, macOS,
-Windows and Android packages, verifies the desktop and APK contracts,
-generates `SHA256SUMS.txt` and publishes the GitHub Release.
+Push `main` before the tag. Pushing a tag only freezes the accepted source; it
+does not start the Release workflow, create a GitHub Release or upload release
+packages. This allows a source-only release checkpoint while publication is
+deferred. Keep the tag unchanged when development continues.
 
-Verify all four downloadable packages and their checksums after publication,
-then return to `develop`. If the release merge itself contains any release-only
-change, reconcile `main` back into `develop`.
+Return to `develop` after tagging. If the release merge itself contains any
+release-only change, reconcile `main` back into `develop`.
+
+## Publish an existing tag
+
+Publication is a separate, explicitly authorized action. Start the Release
+workflow manually from `main`, naming the existing tag to publish:
+
+```bash
+gh workflow run release.yml --ref main -f tag=v0.5.0
+```
+
+Replace `v0.5.0` with the accepted tag when publishing a later version. The
+workflow checks out that tag, validates its SemVer, CMake version and membership
+in `origin/main`, and pins every build to the verified commit. It builds and
+tests Linux, macOS, Windows and Android packages, verifies the desktop and APK
+contracts, generates `SHA256SUMS.txt` and publishes the GitHub Release. The
+workflow does not create or move a tag.
+
+Verify all four downloadable packages and their checksums after publication.
 
 ## Hotfix
 
 Create a focused hotfix from `main`, validate the affected paths and the normal
-release gate, then publish a PATCH version with the same merge-and-tag order.
+release gate, then freeze a PATCH version with the same merge-and-tag order.
+Publish its existing tag using the separate manual workflow when authorized.
 Merge the released `main` back into `develop` so the correction cannot disappear
 from the next MINOR release:
 

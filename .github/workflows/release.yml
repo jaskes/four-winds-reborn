@@ -1,9 +1,15 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to build and publish (vMAJOR.MINOR.PATCH)
+        required: true
+        type: string
+
+env:
+  RELEASE_TAG: ${{ inputs.tag }}
 
 permissions:
   contents: read
@@ -12,26 +18,30 @@ jobs:
   verify-release-source:
     name: Verify tag belongs to main
     runs-on: ubuntu-24.04
+    outputs:
+      commit: ${{ steps.verify-commit.outputs.commit }}
     steps:
       - name: Check out tagged source
         uses: actions/checkout@v6
         with:
+          ref: refs/tags/${{ inputs.tag }}
           fetch-depth: 0
 
       - name: Require the SemVer tag declared by CMake
         shell: bash
         run: |
-          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "::error::Release tags must use vMAJOR.MINOR.PATCH SemVer."
             exit 1
           fi
           project_version="$(sed -nE 's/^project\(FourWindsReborn VERSION ([0-9]+\.[0-9]+\.[0-9]+)\)$/\1/p' CMakeLists.txt)"
-          if [[ -z "$project_version" || "v$project_version" != "$GITHUB_REF_NAME" ]]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match CMake project version ${project_version:-<missing>}."
+          if [[ -z "$project_version" || "v$project_version" != "$RELEASE_TAG" ]]; then
+            echo "::error::Tag $RELEASE_TAG does not match CMake project version ${project_version:-<missing>}."
             exit 1
           fi
 
       - name: Require the tagged commit on main
+        id: verify-commit
         shell: bash
         run: |
           git fetch --no-tags origin main
@@ -39,6 +49,7 @@ jobs:
             echo "::error::Release tags must point to commits already present on origin/main."
             exit 1
           fi
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   validate-data:
     name: Validate theme JSON
@@ -48,6 +59,7 @@ jobs:
       - name: Check out tagged source and engine
         uses: actions/checkout@v6
         with:
+          ref: ${{ needs.verify-release-source.outputs.commit }}
           submodules: recursive
 
       - name: Set up Python
@@ -78,6 +90,7 @@ jobs:
       - name: Check out tagged source and engine
         uses: actions/checkout@v6
         with:
+          ref: ${{ needs.verify-release-source.outputs.commit }}
           submodules: recursive
 
       - name: Install Linux dependencies
@@ -100,7 +113,7 @@ jobs:
       - name: Package Release
         shell: bash
         run: |
-          bundle="four-winds-reborn-${GITHUB_REF_NAME}-${{ matrix.package }}"
+          bundle="four-winds-reborn-${RELEASE_TAG}-${{ matrix.package }}"
           mkdir -p "release/${bundle}"
           cp four-winds-reborn README.md CHANGELOG.md LICENSE "release/${bundle}/"
           cp -R themes "release/${bundle}/"
@@ -121,6 +134,7 @@ jobs:
       - name: Check out tagged source and engine
         uses: actions/checkout@v6
         with:
+          ref: ${{ needs.verify-release-source.outputs.commit }}
           submodules: recursive
 
       - name: Set up MSYS2 UCRT64
@@ -151,7 +165,7 @@ jobs:
       - name: Package Windows Release
         shell: pwsh
         run: |
-          $bundle = "four-winds-reborn-$env:GITHUB_REF_NAME-windows-x64"
+          $bundle = "four-winds-reborn-$env:RELEASE_TAG-windows-x64"
           $bundleRoot = Join-Path release $bundle
           New-Item -ItemType Directory -Force $bundleRoot | Out-Null
           Copy-Item dist/windows/* $bundleRoot -Recurse
@@ -173,6 +187,7 @@ jobs:
       - name: Check out tagged source and engine
         uses: actions/checkout@v6
         with:
+          ref: ${{ needs.verify-release-source.outputs.commit }}
           submodules: recursive
 
       - name: Set up Java 17
@@ -206,7 +221,7 @@ jobs:
       - name: Build and lint installable APK
         shell: bash
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          version="${RELEASE_TAG#v}"
           gradle --project-dir android --stacktrace \
             -PfourWindsVersionName="$version" \
             :app:lintDebug :app:assembleDebug
@@ -216,7 +231,7 @@ jobs:
         run: |
           apk=android/app/build/outputs/apk/debug/app-debug.apk
           aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
-          version="${GITHUB_REF_NAME#v}"
+          version="${RELEASE_TAG#v}"
           "$aapt" dump badging "$apk" | grep -q "package: name='com.jaskes.fourwindsreborn' versionCode='500' versionName='$version'"
           "$aapt" dump badging "$apk" | grep -q "native-code: 'arm64-v8a'"
           unzip -Z1 "$apk" > android-apk-contents.txt
@@ -228,7 +243,7 @@ jobs:
           grep -q '^assets/themes/classic/' android-apk-contents.txt
           grep -q '^assets/themes/reborn/' android-apk-contents.txt
           mkdir -p release
-          cp "$apk" "release/four-winds-reborn-${GITHUB_REF_NAME}-android-arm64.apk"
+          cp "$apk" "release/four-winds-reborn-${RELEASE_TAG}-android-arm64.apk"
 
       - name: Upload Android release package
         uses: actions/upload-artifact@v7
@@ -264,8 +279,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: >-
-          gh release create "$GITHUB_REF_NAME"
+          gh release create "$RELEASE_TAG"
           release-artifacts/*
           --verify-tag
           --generate-notes
-          --title "Four Winds Reborn $GITHUB_REF_NAME"
+          --title "Four Winds Reborn $RELEASE_TAG"
