@@ -11,6 +11,12 @@ The discard and claim controls sit to the right of the shared history. Up to
 in 18 columns, keeping the full wall's history between the two plaques.
 Scry Runes uses a separate row above the opposing name.
 
+All four rule guardians remain visible between actions, as on the FFA table.
+Their resting poses and animation frames share the same Duel position and
+scale: Chao and Pung above the side controls, Game at the lower left, and Kong
+beside the current discard. These are rule guardians, independent of player
+seats. The screen scales its own frame copies without changing cached FFA art.
+
 ## Assets and provenance
 
 - `themes/reborn/assets/images/table-duel.png`: production background, 1448 x
@@ -47,4 +53,3 @@ Continue also checks preservation of the visible action log's owner.
 
 Manual phone checks for touch targeting, background/resume and Continue remain
 part of release acceptance.
-

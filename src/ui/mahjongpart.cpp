@@ -49,6 +49,17 @@ Texture fitTableArtwork(const Texture & texture, const Size & bounds)
     return Display::createTexture(Surface::scale(surface, target, true));
 }
 
+void placeDuelGuardian(SpritesAnimation & animation, const Point & center, const Size & bounds)
+{
+    // The resting pose and every action frame share one place on the table.
+    // Resize the screen's copies, leaving the theme's FFA sprites intact.
+    for(Sprite & frame : animation.sprites)
+    {
+        frame.setTexture(fitTableArtwork(frame, bounds));
+        frame.setPosition(center - frame.size() / 2);
+    }
+}
+
 class ScopedTickPause
 {
     Window & window;
@@ -232,6 +243,10 @@ MahjongPartScreen::MahjongPartScreen() : JsonWindow("screen_mahjongpart.json", n
         croupierPos = Point(296, 190);
         dropStonePos = Point(832, 475);
         fastLogText.position = Point(512, 577);
+        placeDuelGuardian(animationChao, Point(110, 85), Size(168, 168));
+        placeDuelGuardian(animationPung, Point(918, 105), Size(168, 168));
+        placeDuelGuardian(animationKong, Point(948, 455), Size(132, 132));
+        placeDuelGuardian(animationGame, Point(106, 566), Size(168, 168));
         // Keep claims beside the current discard, clear of the discard history.
         const std::pair<const char*, Point> claims[] = {
             {"but_chow", Point(736, 535)}, {"but_pung", Point(816, 535)},
@@ -438,10 +453,10 @@ void MahjongPartScreen::renderWindow(void)
     else
 	animationTurn.renderAll(*this);
 
-    if(!MatchPresentation::duel() || animationChao.isEnabled()) animationChao.render(*this);
-    if(!MatchPresentation::duel() || animationPung.isEnabled()) animationPung.render(*this);
-    if(!MatchPresentation::duel() || animationKong.isEnabled()) animationKong.render(*this);
-    if(!MatchPresentation::duel() || animationGame.isEnabled()) animationGame.render(*this);
+    animationChao.render(*this);
+    animationPung.render(*this);
+    animationKong.render(*this);
+    animationGame.render(*this);
 
     if(0 > variantSelected &&
 	ld.dropStone.isValid() && 0 > stoneSelected)
