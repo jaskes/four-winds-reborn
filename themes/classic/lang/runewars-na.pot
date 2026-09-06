@@ -3420,3 +3420,143 @@ msgstr ""
 #: src/ui/replayviewer.cpp
 msgid "Space: play/pause  Arrows: step  PgUp/PgDn: phase  +/-: speed"
 msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "%1 / %2 players connected"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Classic Rune Game"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Connect to the host on the same network"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Connected"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Connected; waiting for host"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Connecting..."
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Create room"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Free for all"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Host address"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Join room"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Leave room"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Quick Rune Game"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Reconnecting..."
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Room code"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Room code or game version does not match"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Room is full or reconnect token is invalid"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Start match"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "State changed; choose again"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Waiting for disconnected player"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Waiting for players"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Your name"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "human players"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Port"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Unable to read clipboard"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Invalid invitation"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "No LAN address found"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Invitation copied"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Unable to copy invitation"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Port must be between 1 and 65535"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Enter a numeric IPv4 host address"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Invalid room code"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Tap the host address to choose another network"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Copy invitation"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Paste invitation"
+msgstr ""
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Could not join room; check address and invitation"
+msgstr ""

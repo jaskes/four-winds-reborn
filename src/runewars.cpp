@@ -30,6 +30,8 @@
 #include "settings.h"
 #include "intropart.h"
 #include "mainmenu.h"
+#include "multiplayerlobby.h"
+#include "matchsession.h"
 #include "settingsmenu.h"
 #include "encyclopedia.h"
 #include "loadrecovery.h"
@@ -389,6 +391,7 @@ bool RuneWarsClient::exec(void)
     }
 
     int menu = Menu::MainMenu;
+    MultiplayerScenePump networkPump;
     std::string pendingLoadFile = savefile;
     bool promoteRecovery = false;
     Person selectedPerson;
@@ -487,6 +490,11 @@ bool RuneWarsClient::exec(void)
 		menu = ReplayBrowserScreen().exec();
 	    break;
 
+            case Menu::MultiplayerLobby:
+                menu = MultiplayerLobbyScreen().exec();
+                if(Multiplayer::session().started()) selectedPerson = GameData::myPerson();
+            break;
+
 	    case Menu::SelectPerson:
 	    {
 		SelectPersonScreen scr;
@@ -500,6 +508,12 @@ bool RuneWarsClient::exec(void)
 	    break;
 
 	case Menu::ShowPlayers:
+                if(Multiplayer::session().active())
+                {
+                    menu = ShowPlayersScreen().exec();
+                    if(menu == Menu::SelectPerson) menu = Menu::MainMenu;
+                    break;
+                }
 		// Settings stores the default for future games. Once initialization
 		// completes, the selected value lives in the save and is not changed
 		// by later edits to settings.json.
@@ -522,7 +536,8 @@ bool RuneWarsClient::exec(void)
 	    break;
 
 	    case Menu::MahjongInitPart:
-		menu = GameData::initMahjong() ? Menu::MahjongPart : Menu::GameSummaryPart;
+		menu = Multiplayer::session().active() ? Multiplayer::session().phase() :
+                    GameData::initMahjong() ? Menu::MahjongPart : Menu::GameSummaryPart;
 	    break;
 
 	    case Menu::MahjongPart:
@@ -535,8 +550,8 @@ bool RuneWarsClient::exec(void)
 	    break;
 
 	    case Menu::AdventurePart:
-		menu = GameData::initAdventure() ?
-			AdventurePartScreen(selectedPerson.avatar).exec() : Menu::GameSummaryPart;
+		menu = Multiplayer::session().active() ? AdventurePartScreen(Multiplayer::session().localAvatar()).exec() :
+                    GameData::initAdventure() ? AdventurePartScreen(selectedPerson.avatar).exec() : Menu::GameSummaryPart;
 	    break;
 
 	    case Menu::BattleSummaryPart:
@@ -567,6 +582,16 @@ bool RuneWarsClient::exec(void)
 	    break;
 	}
 
+        if(Multiplayer::session().active())
+        {
+            if(menu == Menu::MainMenu || menu == Menu::GameExit) Multiplayer::session().leave();
+            else if(activeMenu == Menu::ShowPlayers || activeMenu == Menu::MahjongSummaryPart ||
+                    activeMenu == Menu::BattleSummaryPart)
+            {
+                menu = waitForMultiplayerPhase(activeMenu);
+                if(menu == Menu::MainMenu) Multiplayer::session().leave();
+            }
+        }
 	CrashReport::breadcrumb(std::string("Screen stage=exit name=").append(menuName(activeMenu))
 	    .append(" next=").append(menuName(menu))
 	    .append(" next_id=").append(String::number(menu)));

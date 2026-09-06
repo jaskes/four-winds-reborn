@@ -28,8 +28,9 @@ the latest published player packages remain `v0.4.0`.
   four-controller Coalition and improved Android touch ergonomics.
 - Expand modular rulesets, mobile accessibility/device coverage and balance
   evidence for the new local modes.
-- Add authoritative multiplayer last, after Android and all local rulesets are
-  stable, versioned and deterministic.
+- The v0.6.0 development branch adds authoritative multiplayer rooms for Duel,
+  FFA and Coalition. See the [play guide](docs/MultiplayerPlayGuide.md) and
+  [verification status](docs/MultiplayerImplementation.md) before testing.
 
 ## Screenshots
 

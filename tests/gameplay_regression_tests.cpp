@@ -5614,12 +5614,20 @@ int runBalanceReplayVerification(int argc, char** argv)
 
 int runLocalModesUiTests(const char* program);
 int runStateIntegrityTests();
+int runClientViewTests();
+int runMatchAuthorityTests();
+int runMultiplayerProcessPeer(int, char**);
+int runSessionProtocolTests();
+int runNetworkAddressTests();
+int runMultiplayerUiTests(const char*);
 int runMatchModeMatrixTests();
 
 int main(int argc, char** argv)
 {
     if(1 < argc && std::string(argv[1]) == "--local-modes-ui-self-test")
         return runLocalModesUiTests(argv[0]);
+    if(1 < argc && std::string(argv[1]) == "--multiplayer-ui-self-test")
+        return runMultiplayerUiTests(argv[0]);
 #if defined(_WIN32)
     if(1 < argc && std::string(argv[1]) == "--windows-crash-report-child")
     {
@@ -5858,6 +5866,16 @@ int main(int argc, char** argv)
 
     if(1 < argc && std::string(argv[1]) == "--state-integrity-self-test")
         return runStateIntegrityTests();
+    if(1 < argc && std::string(argv[1]) == "--client-view-self-test")
+        return runClientViewTests();
+    if(1 < argc && std::string(argv[1]) == "--match-authority-self-test")
+        return runMatchAuthorityTests();
+    if(1 < argc && std::string(argv[1]) == "--multiplayer-process-peer")
+        return runMultiplayerProcessPeer(argc, argv);
+    if(1 < argc && std::string(argv[1]) == "--session-protocol-self-test")
+        return runSessionProtocolTests();
+    if(1 < argc && std::string(argv[1]) == "--network-address-self-test")
+        return runNetworkAddressTests();
 
     if(1 < argc && std::string(argv[1]) == "--match-mode-matrix-self-test")
         return runMatchModeMatrixTests();

@@ -2,7 +2,7 @@
 param(
     [ValidateSet("Debug", "Release")]
     [string]$Configuration = "Debug",
-    [string]$VersionName = "0.5.0-dev",
+    [string]$VersionName = "0.6.0-dev",
     [switch]$Bootstrap,
     [switch]$Clean
 )

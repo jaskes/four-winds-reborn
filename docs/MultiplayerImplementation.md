@@ -1,0 +1,85 @@
+# Multiplayer implementation
+
+The accepted local feature set is frozen at `v0.5.0`, commit
+`88147fce6ac553e8dd68a66ff35a4480aa29f8ee`, on `main`. The tag is pushed;
+GitHub Release publication is deliberately deferred. Development continues on
+`develop`. Never move the tag to include multiplayer work.
+
+## Completion contract
+
+Working multiplayer means a complete match between independent clients, through
+Rune Game, island movement, battles and the same final scores. A connection or a
+shared board alone does not meet this contract. First validate two-player Duel
+over LAN, then private Internet rooms and FFA/Coalition with up to four people
+and AI-filled seats. Windows and Android must use the same protocol.
+
+The host owns commands, RNG, deck, AI, rules, phase transitions and results.
+Clients receive a view filtered for their assigned avatar. Opponent hands,
+future draws and RNG state must never enter another player's transcript.
+Commands bind to the authenticated connection, carry an ordered sequence and
+expected state revision, and cannot execute twice after an acknowledgement is
+lost. A disconnected seat pauses progress and can reconnect to its pending
+choice. Summary pages use an explicit readiness barrier.
+
+## Work in progress
+
+- [x] Run the source freeze gate: 52 matches and 14 identical CSV contracts.
+- [x] Push `main` and annotated `v0.5.0`; disable publication on tag pushes.
+- [x] Create a Codex goal and active continuation heartbeat (30 minutes).
+- [x] Native bounded nonblocking TCP transport and strict JSON decoder.
+- [x] One authority driver, multiplayer discard claims and phase barriers.
+- [x] Recipient views, private prompts and presentation-state hydration.
+- [x] Session protocol, admission, exact-once commands and in-memory reconnect.
+- [x] Host/join lobby and existing gameplay UI integration.
+- [x] Independent-process complete Duel and separate lost-ack reconnect tests.
+- [x] FFA/Coalition, AI seats and complete team results over the network.
+- [x] Direct private-room path with documented security and hosting model.
+- [ ] Android lifecycle and installable Windows/Android review builds.
+- [ ] Offline regression gate, cross-platform CI and a concrete play guide.
+
+September 6 evidence: independent Quick Duel processes completed all six phases
+with identical final categories, team standings and revision. A second complete
+Duel exercises real summons, invasion moves, attacker-only battle choices and
+shared battle results. Coalition with two humans and two AI also completed.
+The full TLS matrix passes five cases: Duel, combat Duel, four-human FFA,
+four-human Coalition, and Coalition with two humans/two AI. Readiness starvation
+and a late summary acknowledgement that could cancel the next island command
+are fixed and covered by focused regressions.
+The sixth process case cuts the encrypted stream during an active Rune hand,
+requires an automatic reconnect, then verifies the same final scores/revision.
+The final 12 offline tests pass; the full cohort gate in
+`diagnostics/multiplayer-gate-20260906` passes 52 matches and 14 byte-identical
+CSV contracts. Russian Reborn UI rendering also passes after final layout fixes.
+
+Recipient-view tests cover private hands, Scry, invisible creatures, final unit
+scores and atomic malformed-input rejection. Session tests cover concurrent
+claims, repeated ready votes, delayed presentation, ordered command queues,
+lost acknowledgements and token reconnect without double execution, wrong
+actors/forced actions, cross-phase acknowledgements and stale state packets.
+The graphical test uses real TLS connections and game buttons; clipboard,
+wrong-secret retry and full lobby rendering are included.
+
+TLS 1.3 PSK plus ephemeral key exchange uses a pinned Mbed TLS 3.6.7 source
+archive and 128-bit random invitations. Security tests cover wrong secrets,
+encrypted capture, tampering/replay, partial I/O, bounded queues and deadlines.
+Windows tests and Android API23 compilation pass. The Android arm64 APK builds,
+passes ABI/package/signature verification and lint. No Android device was
+attached to ADB during this run, so physical lifecycle acceptance remains open.
+
+The direct Internet route uses a reachable host IPv4/port or shared VPN; there
+is no public relay or matchmaking service. See the
+[play guide](MultiplayerPlayGuide.md) for exact setup and in-memory reconnect
+limits. Cross-platform CI, final matrix and package evidence must be recorded
+before declaring the goal complete. A two-device Android lifecycle test and an
+actual route between separate Internet networks remain manual acceptance items.
+
+The network modules live under `src/network`. Transport handles bytes only;
+all GameData access stays on the SDL/UI thread. Scene-level polling continues
+while modal dialogs or summary pages are open. A view and its events travel in
+one revision so a client cannot animate an event against unrelated state.
+
+Automatic continuation must first inspect this plan, the active goal and git
+state. Resume incomplete work; do not spawn competing implementations or repeat
+the source freeze. Disable the heartbeat and complete the goal only after the
+completion contract has evidence. The implementation is a playable development
+candidate; the remaining checks above must not be silently treated as passed.

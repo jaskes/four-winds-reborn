@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.14)
 
-project(FourWindsReborn VERSION 0.5.0)
+project(FourWindsReborn VERSION 0.6.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
@@ -97,6 +97,7 @@ endif()
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DBUILD_DEBUG")
 
 add_subdirectory(engine)
+include(cmake/MultiplayerTLS.cmake)
 
 set(FOUR_WINDS_GAME_REVISION "unknown")
 set(FOUR_WINDS_ENGINE_REVISION "unknown")
@@ -148,6 +149,9 @@ endif()
 if(NOT FOUR_WINDS_ENGINE_REVISION)
     set(FOUR_WINDS_ENGINE_REVISION "unknown")
 endif()
+if(NOT FOUR_WINDS_RELEASE_TAG STREQUAL "v${PROJECT_VERSION}" OR FOUR_WINDS_GAME_DIRTY EQUAL 1)
+    set(FOUR_WINDS_RELEASE_TAG "")
+endif()
 
 option(FOUR_WINDS_WINDOWS_GUI
     "Build the Windows executable without an attached console"
@@ -172,6 +176,15 @@ set(FOUR_WINDS_SOURCE
     src/platform/replayfiles.cpp
     src/platform/savegames.cpp
     src/platform/settings.cpp
+
+    src/network/clientview.cpp
+    src/network/commandwire.cpp
+    src/network/matchauthority.cpp
+    src/network/matchsession.cpp
+    src/network/networkaddress.cpp
+    src/network/securetransport.cpp
+    src/network/tcptransport.cpp
+    src/network/wirejson.cpp
 
     src/rules/actionvalidation.cpp
     src/rules/adventurecommands.cpp
@@ -220,6 +233,7 @@ set(FOUR_WINDS_SOURCE
     src/ui/mahjongpart.cpp
     src/ui/mahjongsummarypart.cpp
     src/ui/mainmenu.cpp
+    src/ui/multiplayerlobby.cpp
     src/ui/replaybrowser.cpp
     src/ui/replayviewer.cpp
     src/ui/runegameinput.cpp
@@ -238,7 +252,8 @@ include_directories(
     src/battle
     src/platform
     src/rules
-    src/ui)
+    src/ui
+    src/network)
 if(ANDROID)
     add_library(four_winds_reborn SHARED ${FOUR_WINDS_SOURCE})
     set_target_properties(four_winds_reborn PROPERTIES OUTPUT_NAME main)
@@ -249,9 +264,9 @@ target_compile_definitions(four_winds_reborn PRIVATE
     ${FOUR_WINDS_BUILD_DEFINITIONS}
     $<$<BOOL:${ANDROID}>:ANDROID>)
 
-target_link_libraries(four_winds_reborn libswe)
+target_link_libraries(four_winds_reborn libswe mbedtls mbedx509 mbedcrypto)
 if(WIN32)
-    target_link_libraries(four_winds_reborn dbghelp comdlg32)
+    target_link_libraries(four_winds_reborn dbghelp comdlg32 ws2_32 bcrypt iphlpapi)
 endif()
 if(NOT ANDROID)
     set_target_properties(four_winds_reborn PROPERTIES
@@ -271,19 +286,77 @@ if(BUILD_TESTING AND NOT ANDROID)
         tests/avatar_balance_tests.cpp
         tests/local_modes_ui_tests.cpp
         tests/state_integrity_tests.cpp
+        tests/clientview_tests.cpp
+        tests/matchauthority_tests.cpp
+        tests/multiplayer_process_peer.cpp
+        tests/session_protocol_tests.cpp
+        tests/multiplayer_ui_tests.cpp
+        tests/network_address_tests.cpp
         src/ai/tournament.cpp
         ${FOUR_WINDS_SOURCE})
     target_compile_definitions(gameplay_regression_tests PRIVATE
         RUNEWARS_NO_MAIN
         ${FOUR_WINDS_BUILD_DEFINITIONS}
         FOUR_WINDS_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
-    target_link_libraries(gameplay_regression_tests libswe)
+    target_link_libraries(gameplay_regression_tests libswe mbedtls mbedx509 mbedcrypto)
     if(WIN32)
-        target_link_libraries(gameplay_regression_tests dbghelp comdlg32)
+        target_link_libraries(gameplay_regression_tests dbghelp comdlg32 ws2_32 bcrypt iphlpapi)
     endif()
     add_test(NAME gameplay_regressions COMMAND gameplay_regression_tests)
     add_test(NAME local_modes_ui COMMAND gameplay_regression_tests --local-modes-ui-self-test)
     add_test(NAME state_integrity COMMAND gameplay_regression_tests --state-integrity-self-test)
+    add_test(NAME multiplayer_client_view COMMAND gameplay_regression_tests --client-view-self-test)
+    add_test(NAME multiplayer_authority COMMAND gameplay_regression_tests --match-authority-self-test)
+    add_test(NAME multiplayer_session_protocol COMMAND gameplay_regression_tests --session-protocol-self-test)
+    add_test(NAME multiplayer_ui COMMAND gameplay_regression_tests --multiplayer-ui-self-test)
+    add_test(NAME multiplayer_addresses COMMAND gameplay_regression_tests --network-address-self-test)
+    set_tests_properties(multiplayer_ui PROPERTIES TIMEOUT 90
+        ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy;SDL_RENDER_DRIVER=software;FOUR_WINDS_SETTINGS_FILE=${CMAKE_BINARY_DIR}/multiplayer-ui/settings.json;FOUR_WINDS_RECOVERY_DIR=${CMAKE_BINARY_DIR}/multiplayer-ui/recovery;FOUR_WINDS_SAVE_DIR=${CMAKE_BINARY_DIR}/multiplayer-ui/saves;FOUR_WINDS_UI_SNAPSHOT_DIR=${CMAKE_BINARY_DIR}/multiplayer-ui/screenshots")
+    add_test(NAME multiplayer_process_duel COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/multiplayer_process_test.py"
+        --executable $<TARGET_FILE:gameplay_regression_tests>)
+    set_tests_properties(multiplayer_process_duel PROPERTIES TIMEOUT 260)
+    add_test(NAME multiplayer_process_combat COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/multiplayer_process_test.py"
+        --executable $<TARGET_FILE:gameplay_regression_tests> --combat)
+    set_tests_properties(multiplayer_process_combat PROPERTIES TIMEOUT 260)
+    add_test(NAME multiplayer_process_reconnect COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/multiplayer_process_test.py"
+        --executable $<TARGET_FILE:gameplay_regression_tests> --reconnect)
+    set_tests_properties(multiplayer_process_reconnect PROPERTIES TIMEOUT 260)
+    foreach(network_case IN ITEMS ffa coalition coalition_ai)
+        if(network_case STREQUAL "ffa")
+            set(network_mode classic-ffa)
+            set(network_humans 4)
+        elseif(network_case STREQUAL "coalition")
+            set(network_mode coalition)
+            set(network_humans 4)
+        else()
+            set(network_mode coalition)
+            set(network_humans 2)
+        endif()
+        add_test(NAME multiplayer_process_${network_case} COMMAND "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/multiplayer_process_test.py"
+            --executable $<TARGET_FILE:gameplay_regression_tests>
+            --mode ${network_mode} --humans ${network_humans})
+        set_tests_properties(multiplayer_process_${network_case} PROPERTIES TIMEOUT 260)
+    endforeach()
+    add_executable(network_transport_tests tests/network_transport_tests.cpp
+        src/network/tcptransport.cpp src/network/wirejson.cpp)
+    target_link_libraries(network_transport_tests libswe)
+    if(WIN32)
+        target_link_libraries(network_transport_tests ws2_32 bcrypt)
+    endif()
+    add_test(NAME multiplayer_transport COMMAND network_transport_tests)
+    add_executable(secure_transport_tests tests/secure_transport_tests.cpp
+        src/network/tcptransport.cpp src/network/securetransport.cpp)
+    target_link_libraries(secure_transport_tests mbedtls mbedx509 mbedcrypto)
+    if(WIN32)
+        target_link_libraries(secure_transport_tests ws2_32 bcrypt)
+    endif()
+    add_test(NAME multiplayer_secure_transport COMMAND secure_transport_tests)
+    set_tests_properties(multiplayer_secure_transport PROPERTIES TIMEOUT 90)
+    set_tests_properties(multiplayer_transport multiplayer_authority multiplayer_client_view PROPERTIES TIMEOUT 120)
     add_test(NAME match_mode_matrix COMMAND gameplay_regression_tests --match-mode-matrix-self-test)
     set_tests_properties(match_mode_matrix PROPERTIES
         TIMEOUT 240

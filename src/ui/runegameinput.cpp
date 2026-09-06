@@ -17,6 +17,7 @@
 #include "dialogs.h"
 #include "runegametargetdialogs.h"
 #include "mahjongpart.h"
+#include "matchsession.h"
 #ifdef BUILD_DEBUG
 #include "developertools.h"
 #endif
@@ -56,6 +57,10 @@ bool MahjongPartScreen::userEvent(int act, void* data)
 
 bool MahjongPartScreen::keyPressEvent(const KeySym & key)
 {
+#ifdef BUILD_DEBUG
+    if(Multiplayer::session().active() &&
+       (key.keycode() == Key::F5 || key.keycode() == Key::F6 || key.keycode() == Key::F9)) return true;
+#endif
     switch(key.keycode())
     {
         case Key::LEFT: return actionSelectedShiftLeft();
@@ -221,7 +226,15 @@ void MahjongPartScreen::actionButtonLocalReady(void)
 bool MahjongPartScreen::submitHumanAction(const ClientMessage & action)
 {
     ActionRejection rejection;
-    if(GameData::client2Mahjong(myAvatar, action, actions, &rejection)) return true;
+    if(Multiplayer::runeCommand(myAvatar, action, actions, &rejection))
+    {
+        if(Multiplayer::session().active() && ld.dropStone.isValid() && !ld.yourTurn() &&
+           (action.type() == Action::ClientButtonPass || action.type() == Action::ClientButtonGame ||
+            action.type() == Action::ClientButtonPung || action.type() == Action::ClientButtonKong1 ||
+            action.type() == Action::ClientChaoVariant))
+            networkClaimSubmitted = true;
+        return true;
+    }
 
     showActionRejection(rejection);
     return false;
@@ -289,30 +302,30 @@ void MahjongPartScreen::actionButtonPass(int rule)
 
     if(rule == WinRule::Game)
     {
-        if(submitHumanAction(ClientSayGame()))
+        if(Multiplayer::session().active() || submitHumanAction(ClientSayGame()))
             choiceCompleted = submitHumanAction(ClientButtonGame());
     }
     else if(rule == WinRule::Kong)
     {
         if(ld.yourTurn())
         {
-            if(submitHumanAction(ClientSayKong(2)))
+            if(Multiplayer::session().active() || submitHumanAction(ClientSayKong(2)))
                 choiceCompleted = submitHumanAction(ClientButtonKong2());
         }
         else
         {
-            if(submitHumanAction(ClientSayKong(1)))
+            if(Multiplayer::session().active() || submitHumanAction(ClientSayKong(1)))
                 choiceCompleted = submitHumanAction(ClientButtonKong1());
         }
     }
     else if(rule == WinRule::Pung)
     {
-        if(submitHumanAction(ClientSayPung()))
+        if(Multiplayer::session().active() || submitHumanAction(ClientSayPung()))
             choiceCompleted = submitHumanAction(ClientButtonPung());
     }
     else if(rule == WinRule::Chao)
     {
-        if(!submitHumanAction(ClientSayChao())) return;
+        if(!Multiplayer::session().active() && !submitHumanAction(ClientSayChao())) return;
         const Stones & chaoVariants = ld.myPlayer().stones.findChaoVariants(ld.dropStone);
 
         if(chaoVariants.size())
@@ -357,7 +370,7 @@ void MahjongPartScreen::actionDropSelected(void)
         {
             retireTurnTimeout();
             // Legacy four-hand Duel must offer the discard to the partner.
-            if(GameData::localMahjongAvatar() == myAvatar)
+            if(!Multiplayer::session().active() && GameData::localMahjongAvatar() == myAvatar)
                 buttonPass->setClicked();
             stoneSelected = -1;
         }

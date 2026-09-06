@@ -4471,3 +4471,143 @@ msgstr "Западная половина"
 
 msgid "You"
 msgstr "Вы"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "%1 / %2 players connected"
+msgstr "Подключено игроков: %1 / %2"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Classic Rune Game"
+msgstr "Классические руны"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Connect to the host on the same network"
+msgstr "Подключение к хосту в общей сети"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Connected"
+msgstr "Подключено"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Connected; waiting for host"
+msgstr "Подключено. Ждём хоста"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Connecting..."
+msgstr "Подключение..."
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Create room"
+msgstr "Создать комнату"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Free for all"
+msgstr "Каждый за себя"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Host address"
+msgstr "Адрес хоста"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Join room"
+msgstr "Войти в комнату"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Leave room"
+msgstr "Покинуть комнату"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Quick Rune Game"
+msgstr "Быстрые руны"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Reconnecting..."
+msgstr "Переподключение..."
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Room code"
+msgstr "Код комнаты"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Room code or game version does not match"
+msgstr "Не совпадает код комнаты или версия игры"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Room is full or reconnect token is invalid"
+msgstr "Комната заполнена или место уже занято"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Start match"
+msgstr "Начать матч"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "State changed; choose again"
+msgstr "Состояние изменилось. Повторите выбор"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Waiting for disconnected player"
+msgstr "Ждём возвращения игрока"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Waiting for players"
+msgstr "Ожидание игроков"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Your name"
+msgstr "Ваше имя"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "human players"
+msgstr "игрока"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Port"
+msgstr "Порт"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Unable to read clipboard"
+msgstr "Не удалось прочитать буфер обмена"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Invalid invitation"
+msgstr "Некорректное приглашение"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "No LAN address found"
+msgstr "Адрес локальной сети не найден"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Invitation copied"
+msgstr "Приглашение скопировано"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Unable to copy invitation"
+msgstr "Не удалось скопировать приглашение"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Port must be between 1 and 65535"
+msgstr "Порт должен быть от 1 до 65535"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Enter a numeric IPv4 host address"
+msgstr "Введите IPv4-адрес хоста"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Invalid room code"
+msgstr "Некорректный код комнаты"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Tap the host address to choose another network"
+msgstr "Нажмите на адрес для выбора другой сети"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Copy invitation"
+msgstr "Копировать приглашение"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Paste invitation"
+msgstr "Вставить приглашение"
+
+#: src/ui/multiplayerlobby.cpp src/ui/networkstatus.h
+msgid "Could not join room; check address and invitation"
+msgstr "Не удалось войти. Проверьте адрес и приглашение"

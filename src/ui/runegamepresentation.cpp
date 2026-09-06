@@ -20,6 +20,7 @@
 #include "actions.h"
 #include "crashreport.h"
 #include "mahjongpart.h"
+#include "matchsession.h"
 
 namespace
 {
@@ -64,6 +65,12 @@ public:
 
 void MahjongPartScreen::tickEvent(u32 ms)
 {
+    if(Multiplayer::session().active() && Multiplayer::session().paused())
+    {
+        turnTimeoutPending = false;
+        animationTurn.setPause(true);
+    }
+    else if(Multiplayer::session().active()) animationTurn.setPause(false);
     // Modal dialogs run a nested event loop. Keep the Mahjong client from polling
     // and handling the same server prompt again while a Luck choice is open.
     if(resolvingLuckChoice) return;
@@ -127,7 +134,9 @@ void MahjongPartScreen::tickEvent(u32 ms)
 	if(actions.empty())
 	{
 	    const bool switched = selectLocalAvatar();
-	    GameData::mahjong2Client(myAvatar, actions);
+	    Multiplayer::runeEvents(myAvatar, actions);
+	    if(Multiplayer::session().active() && networkRevision != Multiplayer::session().revision())
+	        syncNetworkState();
 	    if(switched && actions.empty()) renderWindow();
 	}
 	bool redraw = false;
@@ -228,6 +237,11 @@ void MahjongPartScreen::tickEvent(u32 ms)
 
 bool MahjongPartScreen::actionMahjongLoadData(void)
 {
+    if(Multiplayer::session().active())
+    {
+        syncNetworkState();
+        return true;
+    }
     ld = GameData::toLocalData(myAvatar);
     // A completed Chao clears the authoritative discard before its data
     // refresh reaches the screen. Do not keep rendering a now-invalid Chao
@@ -239,9 +253,53 @@ bool MahjongPartScreen::actionMahjongLoadData(void)
     return true;
 }
 
+void MahjongPartScreen::syncNetworkState(void)
+{
+    const Wind previousWind = ld.currentWind;
+    const Stone previousDraw = ld.myPlayer().newStone;
+    const Stone previousDrop = ld.dropStone;
+    ld = GameData::toLocalData(myAvatar);
+    if(!ld.dropStone.isValid() || previousDrop != ld.dropStone || previousWind != ld.currentWind)
+        networkClaimSubmitted = false;
+    networkRevision = Multiplayer::session().revision();
+    playerReady = true;
+    buttonLocalReady.setVisible(false);
+    const bool playable = Multiplayer::session().phase() == Menu::MahjongPart;
+    const bool ownTurn = playable && ld.yourTurn() && !ld.dropStone.isValid();
+    LocalPlayer& player = ld.myPlayer();
+    if(!ownTurn || previousWind != ld.currentWind || previousDraw != player.newStone)
+        stoneSelected = -1;
+    if(!ld.dropStone.isValid()) variantSelected = -1;
+    if(ownTurn && player.newStone.isValid() && stoneSelected < 0)
+        stoneSelected = static_cast<int>(player.stones.size());
+    // Pung/Chao have no draw, but the caller must still be able to select a
+    // discard after reconnect or when the phase wait consumed the prompt.
+    if(ownTurn && !player.newStone.isValid() && stoneSelected < 0 &&
+       player.stones.size() % 3 == 2)
+        stoneSelected = static_cast<int>(player.stones.size()) - 1;
+    refreshDiscardClaimButtons();
+    if(!playable)
+    {
+        buttonPass->setVisible(false);
+        buttonChao->setVisible(false);
+        buttonPung->setVisible(false);
+        buttonKong->setVisible(false);
+        buttonGame->setVisible(false);
+    }
+    WinResults result;
+    buttonLocalGame.setVisible(ownTurn && player.isWinMahjong(ld.currentWind, ld.roundWind,
+                                                             ld.dropStone, &result));
+    buttonLocalKong.setVisible(ownTurn && player.isMahjongKong2(ld.currentWind));
+    buttonLocalGame.setPosition(localGamePos());
+    buttonLocalKong.setPosition(localKongPos());
+    if(!ownTurn) retireTurnTimeout();
+    else if(stoneSelected >= 0 && !animationTurn.isEnabled()) animationTurn.setEnabled(true);
+    syncAffectedSpellIndicators();
+}
+
 bool MahjongPartScreen::selectLocalAvatar(void)
 {
-    const Avatar selected = GameData::localMahjongAvatar();
+    const Avatar selected = Multiplayer::session().active() ? Multiplayer::session().localAvatar() : GameData::localMahjongAvatar();
     if(!selected.isValid() || selected == myAvatar) return false;
 
     myAvatar = selected;
@@ -255,11 +313,12 @@ bool MahjongPartScreen::selectLocalAvatar(void)
 
 void MahjongPartScreen::refreshDiscardClaimButtons(void)
 {
-    const bool mayClaimDiscard = ld.dropStone.isValid() && !ld.yourTurn();
+    const bool mayClaimDiscard = ld.dropStone.isValid() && !ld.yourTurn() &&
+        (!Multiplayer::session().active() || !networkClaimSubmitted);
     LocalPlayer & player = ld.myPlayer();
     WinResults result;
 
-    buttonPass->setVisible(ld.dropStone.isValid());
+    buttonPass->setVisible(Multiplayer::session().active() ? mayClaimDiscard : ld.dropStone.isValid());
     buttonGame->setVisible(mayClaimDiscard &&
         player.isWinMahjong(ld.currentWind, ld.roundWind, ld.dropStone, &result));
     buttonKong->setVisible(mayClaimDiscard &&
@@ -337,6 +396,8 @@ bool MahjongPartScreen::actionMahjongEnd(const ActionMessage & v)
 
 bool MahjongPartScreen::actionMahjongBegin(const ActionMessage & v)
 {
+    // A rejected command/reconnect replays Begin plus the current prompt.
+    networkClaimSubmitted = false;
     auto action = static_cast<const MahjongBegin &>(v);
     ld.currentWind = action.currentWind();
     ld.roundWind = action.roundWind();

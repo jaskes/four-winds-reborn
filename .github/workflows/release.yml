@@ -117,6 +117,10 @@ jobs:
           mkdir -p "release/${bundle}"
           cp four-winds-reborn README.md CHANGELOG.md LICENSE "release/${bundle}/"
           cp -R themes "release/${bundle}/"
+          if [[ -f THIRD_PARTY_NOTICES.md ]]; then
+            cp THIRD_PARTY_NOTICES.md "release/${bundle}/"
+            cp -R licenses "release/${bundle}/"
+          fi
           tar -czf "release/${bundle}.tar.gz" -C release "${bundle}"
 
       - name: Upload Release package
@@ -232,7 +236,9 @@ jobs:
           apk=android/app/build/outputs/apk/debug/app-debug.apk
           aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
           version="${RELEASE_TAG#v}"
-          "$aapt" dump badging "$apk" | grep -q "package: name='com.jaskes.fourwindsreborn' versionCode='500' versionName='$version'"
+          version_code="$(sed -nE 's/^[[:space:]]*versionCode ([0-9]+)$/\1/p' android/app/build.gradle)"
+          [[ "$version_code" =~ ^[0-9]+$ ]]
+          "$aapt" dump badging "$apk" | grep -q "package: name='com.jaskes.fourwindsreborn' versionCode='$version_code' versionName='$version'"
           "$aapt" dump badging "$apk" | grep -q "native-code: 'arm64-v8a'"
           unzip -Z1 "$apk" > android-apk-contents.txt
           for library in SDL2 SDL2_image SDL2_mixer SDL2_ttf main; do

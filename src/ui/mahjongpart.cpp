@@ -31,6 +31,8 @@
 #include "runegamewidgets.h"
 #include "actions.h"
 #include "mahjongpart.h"
+#include "matchsession.h"
+#include "multiplayerlobby.h"
 #include "matchtopology.h"
 #include "matchpresentation.h"
 
@@ -176,13 +178,13 @@ bool TurnAnimation::isLastSprite(void) const
 }
 
 MahjongPartScreen::MahjongPartScreen() : JsonWindow("screen_mahjongpart.json", nullptr),
-    myAvatar(GameData::localMahjongAvatar()), orderTurn(jobject), animationTurn(jobject, "animation:turn"),
+    myAvatar(Multiplayer::session().active() ? Multiplayer::session().localAvatar() : GameData::localMahjongAvatar()), orderTurn(jobject), animationTurn(jobject, "animation:turn"),
     animationChao(jobject, "animation:chao"), animationPung(jobject, "animation:pung"),
     animationKong(jobject, "animation:kong"), animationGame(jobject, "animation:game"),
     stoneSelected(-1), variantSelected(-1), playersMarker(0), animationDropStep(40),
     animationDropDelay(12), animationDealDelay(55), dealingInitialHand(false), dealtStoneCount(0),
     animatingDrawStone(false), iconAffectedSkull(this), iconAffectedSword(this), iconAffectedNumber(this),
-    iconAffectedDiscard(this), iconAffectedSilence(this), iconAffectedScry(this), playerReady(false),
+    iconAffectedDiscard(this), iconAffectedSilence(this), iconAffectedScry(this), playerReady(Multiplayer::session().active()),
     resolvingLuckChoice(false), turnTimeoutPending(false)
 {
     ld = GameData::toLocalData(myAvatar);
@@ -326,7 +328,7 @@ MahjongPartScreen::MahjongPartScreen() : JsonWindow("screen_mahjongpart.json", n
     buttonGame->setVisible(false);
     buttonGame->setAction(Action::ButtonGame);
 
-    buttonLocalReady.setVisible(true);
+    buttonLocalReady.setVisible(!Multiplayer::session().active());
     buttonLocalKong.setVisible(false);
     buttonLocalGame.setVisible(false);
 
@@ -357,7 +359,12 @@ MahjongPartScreen::MahjongPartScreen() : JsonWindow("screen_mahjongpart.json", n
     }
 
     const JsonObject & savedState = GameData::jsonGUI();
-    if(savedState.isValid()) fromJsonObject(savedState);
+    if(!Multiplayer::session().active() && savedState.isValid()) fromJsonObject(savedState);
+    if(Multiplayer::session().active())
+    {
+        takeMultiplayerHandoffEvents(actions);
+        syncNetworkState();
+    }
 
     // Affected-spell icons are derived from the authoritative player state.
     // Never let stale GUI data from a save briefly resurrect expired effects.

@@ -11,6 +11,24 @@ so that commit, rather than GitHub fork metadata, is the comparison baseline.
 The project retains the original credits and license. Entries below describe
 Reborn work only; they do not claim authorship of inherited code or assets.
 
+## [Unreleased] - planned v0.6.0
+
+Multiplayer development is in progress. The network implementation is not yet
+an accepted playable release; completion evidence is tracked in
+`docs/MultiplayerImplementation.md`.
+
+- Add host/join rooms for Duel, FFA and Coalition, with two to four human seats
+  and AI filling unused seats; retain Quick and Classic Rune Game rules.
+- Drive runes, claims, island commands, battles and final standings from one
+  host authority, with private recipient views and explicit summary readiness.
+- Authenticate and encrypt rooms with TLS 1.3, copy/paste complete invitations,
+  discover local IPv4 interfaces and allow a configurable TCP port.
+- Pause disconnected matches and reconnect a surviving client process with its
+  seat token; deduplicate accepted commands after lost acknowledgements.
+- Add independent-process complete-match, combat, reconnect, privacy, protocol,
+  transport and graphical input tests. Network process-restart saves and public
+  matchmaking/relays remain unimplemented.
+
 ## [0.5.0] - 2026-09-06
 
 Source milestone for the completed local match modes. The source is frozen in

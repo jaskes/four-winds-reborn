@@ -30,6 +30,7 @@
 #include "contentpackage.h"
 #include "crashreport.h"
 #include "gamedata.h"
+#include "matchsession.h"
 #include "gameplayrng.h"
 #include "matchtopology.h"
 #include "recovery.h"
@@ -319,6 +320,7 @@ namespace GameData
 
     bool saveGame(const JsonObject & gui)
     {
+        if(Multiplayer::session().active()) return true;
         const std::string & share = Settings::shareDir();
         if(!Systems::isDirectory(share)) Systems::makeDirectory(share);
         Display::renderScreenshot(Settings::fileSave("game.png"));
@@ -337,6 +339,11 @@ namespace GameData
     bool saveNamedGame(const JsonObject & gui, const std::string & name,
                        bool overwrite, std::string* error)
     {
+        if(Multiplayer::session().active())
+        {
+            if(error) *error = "A network match cannot be saved as a local single-player game.";
+            return false;
+        }
         std::string savedFile;
         if(!SaveGames::writeManual(GameData::toJsonObject(gui), name, overwrite, &savedFile, error))
             return false;
@@ -349,6 +356,7 @@ namespace GameData
 
     bool saveRecovery(const JsonObject & gui, const std::string & reason)
     {
+        if(Multiplayer::session().active()) return true;
         if(!Recovery::enabled()) return true;
         if(gamers.empty()) return false;
 

@@ -5,7 +5,7 @@ plugins {
 def gameRoot = rootDir.parentFile
 def sdlRoot = new File(rootDir, ".deps/SDL2-2.32.10")
 def generatedAssets = layout.buildDirectory.dir("generated/assets/fourWinds")
-def gameVersionName = project.findProperty("fourWindsVersionName") ?: "0.5.0-dev"
+def gameVersionName = project.findProperty("fourWindsVersionName") ?: "0.6.0-dev"
 
 android {
     namespace "com.jaskes.fourwindsreborn"
@@ -16,7 +16,7 @@ android {
         applicationId "com.jaskes.fourwindsreborn"
         minSdk 23
         targetSdk 35
-        versionCode 500
+        versionCode 600
         versionName gameVersionName
 
         externalNativeBuild {
@@ -86,6 +86,8 @@ tasks.register("syncGameAssets", Sync) {
     description = "Copies theme data into the APK and writes its virtual filesystem manifest."
     from(gameRoot) {
         include "themes/**"
+        include "THIRD_PARTY_NOTICES.md"
+        include "licenses/**"
         exclude "themes/**/__pycache__/**"
         exclude "themes/**/*.tmp"
     }

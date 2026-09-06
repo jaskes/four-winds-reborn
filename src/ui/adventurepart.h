@@ -240,6 +240,7 @@ class AdventurePartScreen : public MapScreenBase
 
     ActionList          actions;
     TickTrigger		tt;
+    std::uint64_t       networkRevision = 0;
 
 #ifdef BUILD_DEBUG
     std::unique_ptr<DebugConsole> console;
@@ -254,6 +255,7 @@ class AdventurePartScreen : public MapScreenBase
     bool		isAdventureMode(void) const override { return true; }
     bool                submitHumanAction(const ClientMessage &);
     bool                selectLocalAvatar(void);
+    void                syncNetworkState(void);
     void                showActionRejection(const ActionRejection &);
     void		updateCommandButtons(void);
     bool                commitPendingOrders(void);

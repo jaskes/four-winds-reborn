@@ -106,6 +106,8 @@ jobs:
             themes/
             README.md
             LICENSE
+            THIRD_PARTY_NOTICES.md
+            licenses/
           retention-days: 7
 
   windows:
@@ -220,7 +222,7 @@ jobs:
         run: |
           apk=android/app/build/outputs/apk/debug/app-debug.apk
           aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
-          "$aapt" dump badging "$apk" | grep -q "package: name='com.jaskes.fourwindsreborn' versionCode='500' versionName='0.5.0-dev'"
+          "$aapt" dump badging "$apk" | grep -q "package: name='com.jaskes.fourwindsreborn' versionCode='600' versionName='0.6.0-dev'"
           "$aapt" dump badging "$apk" | grep -q "native-code: 'arm64-v8a'"
           unzip -Z1 "$apk" > android-apk-contents.txt
           for library in SDL2 SDL2_image SDL2_mixer SDL2_ttf main; do

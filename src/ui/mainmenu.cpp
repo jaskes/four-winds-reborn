@@ -43,7 +43,7 @@ MainMenuScreen::MainMenuScreen(bool saveExists, bool saveValid, bool recoveryExi
              Menu::ReplayLibrary, true);
     addEntry(_("Encyclopedia"), "", Menu::Encyclopedia, true);
     addEntry(_("Settings"), "", Menu::SettingsMenu, true);
-    addEntry(_("Multiplayer"), _("PLANNED"), Menu::GameExit, false);
+    addEntry(_("Multiplayer"), "", Menu::MultiplayerLobby, true);
     addEntry(_("Quit"), "", Menu::GameExit, true);
 
     selected = saveValid ? 0 : 1;

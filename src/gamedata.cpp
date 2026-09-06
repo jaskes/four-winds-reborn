@@ -689,6 +689,42 @@ LocalData GameData::toLocalData(const Avatar & ava)
     return ld;
 }
 
+void GameData::applyClientView(const LocalData & view, int phase,
+                              const std::vector<std::pair<Land, Clan>> & owners,
+                              const std::list<BattleLegend> & history)
+{
+    LocalPlayers projected;
+    for(const auto & player : view.players)
+        if(player.avatar.isValid()) projected.push_back(player);
+    std::sort(projected.begin(), projected.end(), [](const auto & first, const auto & second) {
+        return first.wind() < second.wind();
+    });
+    person = view.myPlayer();
+    gamers = std::move(projected);
+    currentWind = view.currentWind;
+    roundWind = view.roundWind;
+    partWind = view.partWind;
+    stoneLastCount = view.stoneLastCount;
+    dropStone = view.dropStone;
+    winResult = view.winResult;
+    gamePart = phase; // setGamePart would advance creature/army rules locally.
+    croupier.bank.clear();
+    croupier.luckDraw.clear();
+    croupier.trash = view.trashSet;
+    croupier.last = 0;
+    skipRepeatSay = skipNewStone = skipNewTurn = false;
+    battleUnitId = 1;
+    assistedByDeveloper = false;
+#ifdef BUILD_DEBUG
+    developerAutoplayAvatar = Avatar();
+#endif
+    resetAdventureCommandState();
+    pendingBattle = PendingBattle();
+    battleHistory = history;
+    stateGUI.clear();
+    for(const auto & owner : owners) landsInfo[owner.first()].clan = owner.second;
+}
+
 BattleArmy & GameData::getBattleArmy(const Clan & clan)
 {
     return playerOfClan(clan).army;

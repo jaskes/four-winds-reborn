@@ -54,7 +54,8 @@ namespace Menu
         LoadRecovery = 11,
         SettingsMenu = 12,
         Encyclopedia = 13,
-        ReplayLibrary = 14
+        ReplayLibrary = 14,
+        MultiplayerLobby = 15
     };
 }
 
@@ -310,6 +311,11 @@ namespace GameData
     void                        retranslateThemeData(void);
 
     LocalData                   toLocalData(const Avatar &);
+    // Accepts an already validated presentation projection, never a save or
+    // authoritative snapshot. Multiplayer::applyClientView validates the wire.
+    void                        applyClientView(const LocalData &, int phase,
+                                                const std::vector<std::pair<Land, Clan>> & owners,
+                                                const std::list<BattleLegend> & history);
 
     void			dumpOrderPersons(void);
 

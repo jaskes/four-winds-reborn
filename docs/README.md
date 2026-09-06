@@ -12,6 +12,11 @@ and evidence that should change with them.
 The [v0.5.0 candidate review](RCReview-v0.5.0.md) records the local-mode fixes,
 two-player Duel contract, verification evidence and remaining manual checks.
 
+The [multiplayer implementation plan](MultiplayerImplementation.md) tracks the
+active v0.6.0 work, its completion contract and current verification.
+The [multiplayer play guide](MultiplayerPlayGuide.md) explains room setup,
+direct Internet connections and reconnect limitations.
+
 ## Rules and contracts
 
 - [`RulesDecisions.md`](RulesDecisions.md) — intentional decisions where

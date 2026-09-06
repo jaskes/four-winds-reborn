@@ -34,6 +34,8 @@
 #include "aibattle.h"
 #include "aiprofile.h"
 #include "adventurepart.h"
+#include "matchsession.h"
+#include "multiplayerlobby.h"
 #include "crashreport.h"
 #include "swe/swe_music.h"
 #ifdef BUILD_DEBUG
@@ -962,6 +964,11 @@ AdventurePartScreen::AdventurePartScreen(const Avatar & ava) : MapScreenBase(Gam
 #ifdef BUILD_DEBUG
     debugLand = Land::TowerOf4Winds;
 #endif
+    if(Multiplayer::session().active())
+    {
+        takeMultiplayerHandoffEvents(actions);
+        syncNetworkState();
+    }
 }
 
 void AdventurePartScreen::renderLabel(void)
@@ -980,7 +987,12 @@ void AdventurePartScreen::tickEvent(u32 ms)
     if(allowTickEvent && tt.check(ms, 100))
     {
         const bool switched = actions.empty() && selectLocalAvatar();
-        GameData::adventure2Client(myAvatar, actions);
+        if(actions.empty())
+        {
+            Multiplayer::adventureEvents(myAvatar, actions);
+            if(Multiplayer::session().active() && networkRevision != Multiplayer::session().revision() && history.empty())
+                syncNetworkState();
+        }
         bool redraw = switched;
         bool processedAction = false;
         int lastActionType = Action::None;
@@ -1041,7 +1053,7 @@ void AdventurePartScreen::tickEvent(u32 ms)
 
 bool AdventurePartScreen::selectLocalAvatar(void)
 {
-    const Avatar selected = GameData::localAdventureAvatar();
+    const Avatar selected = Multiplayer::session().active() ? Multiplayer::session().localAvatar() : GameData::localAdventureAvatar();
     if(!selected.isValid() || selected == myAvatar) return false;
 
     cancelOrderMode(false);
@@ -1057,13 +1069,15 @@ bool AdventurePartScreen::actionAdventureTurn(const ActionMessage & v)
 {
     auto action = static_cast<const AdventureTurn &>(v);
 
+    if(Multiplayer::session().active()) syncNetworkState();
+
     ld.currentWind = action.currentWind();
     const RemotePlayer & player = ld.playerOfWind(ld.currentWind);
 
     if(!ld.yourTurn()) cancelOrderMode(false);
     updateCommandButtons();
 
-    if(ld.yourTurn() && buttonDone)
+    if(ld.yourTurn() && buttonDone && !ld.myPlayer().adventurePartDone())
     {
 	buttonDone->setDisabled(false);
     }
@@ -1079,7 +1093,8 @@ bool AdventurePartScreen::actionAdventureMoves(const ActionMessage & v)
     auto action = static_cast<const AdventureMoves &>(v);
     ld.currentWind = action.currentWind();
 
-    if(! ld.yourTurn())
+    if(Multiplayer::session().active()) syncNetworkState();
+    else if(! ld.yourTurn())
     {
 	// read raw info
 	MapScreenBase::ld = GameData::toLocalData(myAvatar);
@@ -1087,6 +1102,30 @@ bool AdventurePartScreen::actionAdventureMoves(const ActionMessage & v)
 
     DEBUG("current wind: " << ld.currentWind.toString() << ", uid: " << action.unit() << ", to land: " << action.land().toString());
     return true;
+}
+
+void AdventurePartScreen::syncNetworkState(void)
+{
+    std::set<int> selected;
+    for(const BattleCreature* creature : ld.myPlayer().army.toBattleCreatures())
+        if(creature->isSelected()) selected.insert(creature->battleUnit());
+    const Wind previousWind = ld.currentWind;
+    ld = GameData::toLocalData(myAvatar);
+    networkRevision = Multiplayer::session().revision();
+    for(BattleCreature* creature : ld.myPlayer().army.toBattleCreatures())
+        creature->setSelected(previousWind != ld.currentWind || selected.count(creature->battleUnit()));
+    selectedCreature.reset();
+    affectedSpells.setVisible(false);
+    bar1.reset();
+    bar2.reset();
+    const bool mayMove = Multiplayer::session().phase() == Menu::AdventurePart &&
+        ld.yourTurn() && !ld.myPlayer().adventurePartDone();
+    if(buttonDone) buttonDone->setDisabled(!mayMove);
+    if(!mayMove) cancelOrderMode(false);
+    updateCommandButtons();
+    if(selectedLand.isValid())
+        pushEventAction(MapScreenSelectLand, this, const_cast<LandInfo*>(&GameData::landInfo(selectedLand)));
+    DisplayScene::pushEvent(nullptr, LandPolygonFlagAnimationReInit, nullptr);
 }
 
 bool AdventurePartScreen::actionAdventureClaim(const ActionMessage & v)

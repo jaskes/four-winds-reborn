@@ -32,6 +32,7 @@
 #include "adventureuievents.h"
 #include "actions.h"
 #include "adventurepart.h"
+#include "matchsession.h"
 #ifdef BUILD_DEBUG
 #include "developertools.h"
 #endif
@@ -61,7 +62,7 @@ public:
 bool AdventurePartScreen::submitHumanAction(const ClientMessage & action)
 {
     ActionRejection rejection;
-    if(GameData::client2Adventure(myAvatar, action, actions, &rejection)) return true;
+    if(Multiplayer::adventureCommand(myAvatar, action, actions, &rejection)) return true;
 
     showActionRejection(rejection);
     return false;
@@ -75,10 +76,12 @@ void AdventurePartScreen::showActionRejection(const ActionRejection & rejection)
 
 void AdventurePartScreen::updateCommandButtons(void)
 {
+    const bool ownsTurn = ld.yourTurn() && (!Multiplayer::session().active() ||
+        (Multiplayer::session().phase() == Menu::AdventurePart && !ld.myPlayer().adventurePartDone()));
     const bool hasSelected = selectedLand.isValid() &&
 	0 < ld.myPlayer().army.partySelected(selectedLand).size();
-    const bool canDismiss = ld.yourTurn() && selectedClan == ld.myPlayer().clan && hasSelected;
-    const bool canOrder = ld.yourTurn() && selectedLand.isValid() &&
+    const bool canDismiss = ownsTurn && selectedClan == ld.myPlayer().clan && hasSelected;
+    const bool canOrder = ownsTurn && selectedLand.isValid() &&
 	isAllowMoveFlag(GameData::landInfo(selectedLand));
 
     if(buttonDismiss) buttonDismiss->setDisabled(!canDismiss);
@@ -437,6 +440,10 @@ void AdventurePartScreen::actionButtonDone(void)
 
 bool AdventurePartScreen::keyPressEvent(const KeySym & ks)
 {
+#ifdef BUILD_DEBUG
+    if(Multiplayer::session().active() &&
+       (ks.keycode() == Key::F9 || ks.keycode() == Key::BACKQUOTE)) return true;
+#endif
     if(ks.keycode() == SWE::Key::ESCAPE)
     {
 	if(orderSource.isValid()) cancelOrderMode();

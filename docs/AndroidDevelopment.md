@@ -47,7 +47,7 @@ ABI, native libraries, assets and signing.
 The generated test package is copied to:
 
 ```text
-dist/android/four-winds-reborn-v0.5.0-dev-android-arm64-debug.apk
+dist/android/four-winds-reborn-v0.6.0-dev-android-arm64-debug.apk
 ```
 
 ## Runtime model

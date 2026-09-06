@@ -139,10 +139,13 @@ class MahjongPartScreen : public JsonWindow
     bool                turnTimeoutPending;
     ActionList		actions;
     TickTrigger		tt;
+    std::uint64_t       networkRevision = 0;
+    bool                networkClaimSubmitted = false;
 
     void		actionButtonLocalReady(void);
     bool                selectLocalAvatar(void);
     void                refreshDiscardClaimButtons(void);
+    void                syncNetworkState(void);
     bool                submitHumanAction(const ClientMessage &);
     void                showActionRejection(const ActionRejection &);
     void                retireTurnTimeout(void);

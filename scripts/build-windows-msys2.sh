@@ -86,6 +86,8 @@ trap 'rm -rf "$staging_dir"' EXIT
 mkdir -p "$staging_dir"
 cp "$build_dir/four-winds-reborn.exe" "$staging_dir/"
 cp -R "$repo_root/themes" "$staging_dir/"
+cp "$repo_root/THIRD_PARTY_NOTICES.md" "$staging_dir/"
+cp -R "$repo_root/licenses" "$staging_dir/"
 
 # Compile translations from their editable source on every package build.
 # This prevents an updated .po file from silently shipping with a stale .mo.
